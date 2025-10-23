@@ -2,7 +2,9 @@ use crate::card::Suit;
 use crate::effect::Effects;
 use crate::game::Game;
 use crate::hand::MadeHand;
+use crate::rank::HandRank;
 use pyo3::pyclass;
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use strum::{EnumIter, IntoEnumIterator};
@@ -232,6 +234,7 @@ make_jokers!(
     Stuntman,
     Canio,
     Yorick,
+    CardSharp,
     Chicot
 );
 
@@ -871,10 +874,33 @@ impl Joker for RaisedFist {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultPlus]
     }
-    fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Needs access to player hand (cards held but not played)
-        // Would need: game.hand.iter().map(|c| c.value).min()
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        use crate::card::Value;
+        // Find lowest ranked card in hand and get its rank value
+        let lowest_rank_value = game.hand.iter().map(|c| match c.value {
+            Value::Two => 2,
+            Value::Three => 3,
+            Value::Four => 4,
+            Value::Five => 5,
+            Value::Six => 6,
+            Value::Seven => 7,
+            Value::Eight => 8,
+            Value::Nine => 9,
+            Value::Ten => 10,
+            Value::Jack => 10,
+            Value::Queen => 10,
+            Value::King => 10,
+            Value::Ace => 11,
+        }).min().unwrap_or(0);
+        let mult_bonus = lowest_rank_value * 2;
+
+        fn apply(g: &mut Game, _hand: MadeHand, bonus: usize) {
+            g.mult += bonus;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_bonus);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -1176,11 +1202,18 @@ impl Joker for Supernova {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultPlus]
     }
-    fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Needs to track which hand rank was just played
-        // Would add mult equal to the number of times that hand has been played
-        // Requires: hand rank context in OnScore callback
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        // Clone the play counts HashMap for the closure
+        let play_counts = game.hand_rank_play_counts.clone();
+
+        fn apply(g: &mut Game, hand: MadeHand, counts: HashMap<HandRank, usize>) {
+            let times_played = counts.get(&hand.rank).copied().unwrap_or(0);
+            g.mult += times_played;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, play_counts.clone());
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -1206,10 +1239,16 @@ impl Joker for RideTheBus {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultPlus]
     }
-    fn effects(&self, _in: &Game) -> Vec<Effects> {
-        // Note: Full implementation would require state tracking
-        // Simplified: just check if current hand has no face cards
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let mult_bonus = game.round_state.consecutive_hands_without_faces;
+
+        fn apply(g: &mut Game, _hand: MadeHand, bonus: usize) {
+            g.mult += bonus;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_bonus);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -1266,10 +1305,17 @@ impl Joker for IceCream {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::Chips]
     }
-    fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Needs stateful tracking of hands played this round
-        // Would subtract 5 chips per hand played
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let chips_bonus = 100_isize - (game.hands_played_this_blind as isize * 5);
+        let chips_bonus = chips_bonus.max(0) as usize; // Don't go negative
+
+        fn apply(g: &mut Game, _hand: MadeHand, bonus: usize) {
+            g.chips += bonus;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, chips_bonus);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -1421,16 +1467,34 @@ impl Joker for Hiker {
 }
 
 // Joker #39: Green Joker - Stateful
-#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "python", pyclass(eq))]
-pub struct GreenJoker {}
+pub struct GreenJoker {
+    pub bonus_mult: isize,  // Accumulated mult bonus (can be negative)
+}
+
+impl Default for GreenJoker {
+    fn default() -> Self {
+        Self { bonus_mult: 0 }
+    }
+}
+
+impl GreenJoker {
+    pub fn on_hand_played(&mut self) {
+        self.bonus_mult += 1;
+    }
+
+    pub fn on_discard_used(&mut self) {
+        self.bonus_mult -= 1;
+    }
+}
 
 impl Joker for GreenJoker {
     fn name(&self) -> String {
         "Green Joker".to_string()
     }
     fn desc(&self) -> String {
-        "+1 Mult per hand played; -1 Mult per discard".to_string()
+        format!("{:+} Mult (+1 per hand played; -1 per discard)", self.bonus_mult)
     }
     fn cost(&self) -> usize {
         4
@@ -1441,9 +1505,20 @@ impl Joker for GreenJoker {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultPlus]
     }
-    fn effects(&self, _in: &Game) -> Vec<Effects> {
-        // Stateful - needs to track across rounds
-        vec![]
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        let mult_bonus = self.bonus_mult;
+
+        fn apply(g: &mut Game, _hand: MadeHand, bonus: isize) {
+            if bonus >= 0 {
+                g.mult += bonus as usize;
+            } else {
+                g.mult = g.mult.saturating_sub((-bonus) as usize);
+            }
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_bonus);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -1495,9 +1570,20 @@ impl Joker for ToDoList {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::Economy]
     }
-    fn effects(&self, _in: &Game) -> Vec<Effects> {
-        // Stateful - changes per round
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let todo_hand = game.round_state.todo_hand;
+
+        fn apply(g: &mut Game, hand: MadeHand, target: Option<HandRank>) {
+            if let Some(target_rank) = target {
+                if hand.rank == target_rank {
+                    g.money += 5;
+                }
+            }
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, todo_hand);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -1830,8 +1916,17 @@ impl Joker for Popcorn {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultPlus]
     }
-    fn effects(&self, _in: &Game) -> Vec<Effects> {
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let mult_bonus = 20_isize - (game.round as isize * 4);
+        let mult_bonus = mult_bonus.max(0) as usize; // Don't go negative
+
+        fn apply(g: &mut Game, _hand: MadeHand, bonus: usize) {
+            g.mult += bonus;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_bonus);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -1890,10 +1985,18 @@ impl Joker for ShootTheMoon {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultPlus]
     }
-    fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Needs access to player hand (cards held but not played)
-        // Would need: game.hand.iter().filter(|c| c.value == Value::Queen).count() * 13
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        use crate::card::Value;
+        let queen_count = game.hand.iter().filter(|c| c.value == Value::Queen).count();
+        let mult_bonus = queen_count * 13;
+
+        fn apply(g: &mut Game, _hand: MadeHand, bonus: usize) {
+            g.mult += bonus;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_bonus);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -1996,10 +2099,24 @@ impl Joker for ReservedParking {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::Economy]
     }
-    fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Needs access to player hand (cards held but not played)
-        // Would need: game.hand.iter().filter(|c| c.is_face()).count() with random chance
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let face_cards: Vec<_> = game.hand.iter().filter(|c| c.is_face()).collect();
+        let mut money_bonus = 0;
+
+        // Each face card has 1 in 3 chance to give $1
+        for _ in &face_cards {
+            if rand::random::<f32>() < 1.0 / 3.0 {
+                money_bonus += 1;
+            }
+        }
+
+        fn apply(g: &mut Game, _hand: MadeHand, money: usize) {
+            g.money += money;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, money_bonus);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -2857,9 +2974,18 @@ impl Joker for Blackboard {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultMult]
     }
-    fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Needs access to full hand (all cards held, not just played)
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        // Check if all cards in hand are Spades or Clubs
+        let all_black = game.hand.iter().all(|c| c.suit == Suit::Spade || c.suit == Suit::Club);
+        let mult_multiplier = if all_black { 3 } else { 1 };
+
+        fn apply(g: &mut Game, _hand: MadeHand, multiplier: usize) {
+            g.mult = g.mult * multiplier;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_multiplier);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -2981,10 +3107,18 @@ impl Joker for Baron {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultMult]
     }
-    fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Needs access to full hand (all cards held, not just played)
-        // Would need: game.hand.iter().filter(|c| c.value == Value::King).count()
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        use crate::card::Value;
+        let king_count = game.hand.iter().filter(|c| c.value == Value::King).count();
+        let mult_multiplier = 1.5_f32.powi(king_count as i32);
+
+        fn apply(g: &mut Game, _hand: MadeHand, multiplier: f32) {
+            g.mult = (g.mult as f32 * multiplier) as usize;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_multiplier);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -3233,10 +3367,22 @@ impl Joker for AncientJoker {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultMult]
     }
-    fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Needs stateful tracking of the current suit
-        // Would need to randomly select a suit and track it across rounds
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let ancient_suit = game.round_state.ancient_suit;
+
+        fn apply(g: &mut Game, hand: MadeHand, suit: Option<Suit>) {
+            if let Some(target_suit) = suit {
+                let matching_cards = hand.all.iter().filter(|c| c.suit == target_suit).count();
+                if matching_cards > 0 {
+                    let multiplier = 1.5_f32.powi(matching_cards as i32);
+                    g.mult = (g.mult as f32 * multiplier) as usize;
+                }
+            }
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, ancient_suit);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -3269,15 +3415,40 @@ impl Joker for Stuntman {
 }
 
 // Joker: Canio - Gains X1 Mult when a face card is destroyed
-#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "python", pyclass(eq))]
-pub struct Canio {}
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass)]
+pub struct Canio {
+    pub bonus_mult: f32,  // Accumulated X mult multiplier (starts at 1.0)
+}
+
+// Manual implementations for Eq and Hash since f32 doesn't support them
+impl Eq for Canio {}
+
+impl std::hash::Hash for Canio {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Hash the bits of the f32 for deterministic hashing
+        self.bonus_mult.to_bits().hash(state);
+    }
+}
+
+impl Default for Canio {
+    fn default() -> Self {
+        Self { bonus_mult: 1.0 }
+    }
+}
+
+impl Canio {
+    pub fn on_face_card_destroyed(&mut self) {
+        self.bonus_mult += 1.0;
+    }
+}
+
 impl Joker for Canio {
     fn name(&self) -> String {
         "Canio".to_string()
     }
     fn desc(&self) -> String {
-        "Gains X1 Mult when a face card is destroyed".to_string()
+        format!("X{} Mult (gains X1 Mult when a face card is destroyed)", self.bonus_mult)
     }
     fn cost(&self) -> usize {
         0
@@ -3289,22 +3460,59 @@ impl Joker for Canio {
         vec![Categories::MultMult]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Needs stateful tracking of destroyed face cards
-        // Would accumulate X mult over time
-        vec![]
+        let mult_multiplier = self.bonus_mult;
+
+        fn apply(g: &mut Game, _hand: MadeHand, multiplier: f32) {
+            g.mult = (g.mult as f32 * multiplier) as usize;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_multiplier);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
 // Joker: Yorick - Gains X1 Mult every 23 cards discarded
-#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "python", pyclass(eq))]
-pub struct Yorick {}
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass)]
+pub struct Yorick {
+    pub cards_discarded: usize,  // Total cards discarded
+    pub bonus_mult: f32,          // Accumulated X mult (starts at 1.0)
+}
+
+impl Default for Yorick {
+    fn default() -> Self {
+        Self {
+            cards_discarded: 0,
+            bonus_mult: 1.0,
+        }
+    }
+}
+
+impl Eq for Yorick {}
+
+impl std::hash::Hash for Yorick {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.cards_discarded.hash(state);
+        self.bonus_mult.to_bits().hash(state);
+    }
+}
+
+impl Yorick {
+    pub fn on_cards_discarded(&mut self, count: usize) {
+        self.cards_discarded += count;
+        // Every 23 cards, gain X1 mult
+        let levels = self.cards_discarded / 23;
+        self.bonus_mult = 1.0 + levels as f32;
+    }
+}
+
 impl Joker for Yorick {
     fn name(&self) -> String {
         "Yorick".to_string()
     }
     fn desc(&self) -> String {
-        "Gains X1 Mult every 23 cards discarded".to_string()
+        format!("X{} Mult ({}/23 cards discarded for next level)", self.bonus_mult, self.cards_discarded % 23)
     }
     fn cost(&self) -> usize {
         0
@@ -3316,9 +3524,51 @@ impl Joker for Yorick {
         vec![Categories::MultMult]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Needs stateful tracking of cards discarded
-        // Would accumulate X mult over time
-        vec![]
+        let mult_multiplier = self.bonus_mult;
+
+        fn apply(g: &mut Game, _hand: MadeHand, multiplier: f32) {
+            g.mult = (g.mult as f32 * multiplier) as usize;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_multiplier);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: Card Sharp - X3 Mult if hand type already played this round
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct CardSharp {}
+
+impl Joker for CardSharp {
+    fn name(&self) -> String {
+        "Card Sharp".to_string()
+    }
+    fn desc(&self) -> String {
+        "X3 Mult if poker hand has already been played this round".to_string()
+    }
+    fn cost(&self) -> usize {
+        6
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let hands_played = game.round_state.hands_played_this_round.clone();
+
+        fn apply(g: &mut Game, hand: MadeHand, played: std::collections::HashSet<HandRank>) {
+            if played.contains(&hand.rank) {
+                g.mult = g.mult * 3;
+            }
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, hands_played.clone());
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 

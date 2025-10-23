@@ -18,6 +18,21 @@ use crate::tag::{Tag, TagPack};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
+/// Per-round state that resets at the start of each blind
+#[derive(Debug, Clone, Default)]
+pub struct RoundState {
+    // Random selections that change each round
+    pub idol_rank: Option<Value>,
+    pub idol_suit: Option<Suit>,
+    pub ancient_suit: Option<Suit>,
+    pub todo_hand: Option<HandRank>,
+    pub mail_rebate_rank: Option<Value>,
+
+    // Round tracking
+    pub hands_played_this_round: HashSet<HandRank>,
+    pub consecutive_hands_without_faces: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct Game {
     pub config: Config,
@@ -77,6 +92,11 @@ pub struct Game {
     pub blinds_skipped_count: usize,         // For Speed Tag
     pub pending_tag_pack: Option<TagPack>,   // Tag pack waiting for selection
     pub tag_pack_selections_made: usize,     // How many selections from current pack
+
+    // Phase 8: Stateful Joker Support
+    pub hand: Vec<Card>,                           // Current cards in player's hand
+    pub round_state: RoundState,                   // Per-round state for stateful jokers
+    pub hand_rank_play_counts: HashMap<HandRank, usize>,  // Count of times each hand rank has been played (for Supernova)
 }
 
 impl Game {
@@ -162,6 +182,9 @@ impl Game {
             blinds_skipped_count: 0,
             pending_tag_pack: None,
             tag_pack_selections_made: 0,
+            hand: Vec::new(),
+            round_state: RoundState::default(),
+            hand_rank_play_counts: HashMap::new(),
             config,
         }
     }
@@ -202,9 +225,50 @@ impl Game {
     // draw from deck to available
     fn draw(&mut self, count: usize) {
         if let Some(drawn) = self.deck.draw(count) {
+            self.hand.extend(drawn.clone());  // Update hand tracking
             self.available.extend(drawn);
-            // self.available.extend(drawn);
         }
+    }
+
+    /// Reset and randomize RoundState at the start of each blind
+    fn reset_round_state(&mut self) {
+        use rand::seq::SliceRandom;
+        let mut rng = rand::thread_rng();
+
+        // Randomize idol selections (The Idol joker)
+        let all_ranks = vec![
+            Value::Two, Value::Three, Value::Four, Value::Five, Value::Six,
+            Value::Seven, Value::Eight, Value::Nine, Value::Ten,
+            Value::Jack, Value::Queen, Value::King, Value::Ace,
+        ];
+        let all_suits = vec![Suit::Club, Suit::Diamond, Suit::Heart, Suit::Spade];
+
+        self.round_state.idol_rank = all_ranks.choose(&mut rng).copied();
+        self.round_state.idol_suit = all_suits.choose(&mut rng).copied();
+
+        // Randomize ancient suit (Ancient Joker)
+        self.round_state.ancient_suit = all_suits.choose(&mut rng).copied();
+
+        // Randomize todo hand (To Do List joker)
+        let all_hand_ranks = vec![
+            HandRank::HighCard,
+            HandRank::OnePair,
+            HandRank::TwoPair,
+            HandRank::ThreeOfAKind,
+            HandRank::Straight,
+            HandRank::Flush,
+            HandRank::FullHouse,
+            HandRank::FourOfAKind,
+            HandRank::StraightFlush,
+        ];
+        self.round_state.todo_hand = all_hand_ranks.choose(&mut rng).copied();
+
+        // Randomize mail rebate rank (Mail-In Rebate joker)
+        self.round_state.mail_rebate_rank = all_ranks.choose(&mut rng).copied();
+
+        // Reset round tracking
+        self.round_state.hands_played_this_round.clear();
+        self.round_state.consecutive_hands_without_faces = 0;
     }
 
     // shuffle and deal new cards to available
@@ -319,7 +383,28 @@ impl Game {
 
         self.plays -= 1;
         self.hands_played_count += 1; // Track for Handy Tag
+
+        // Track hand rank play count (for Supernova joker)
+        *self.hand_rank_play_counts.entry(best.rank).or_insert(0) += 1;
+        // Track hands played this round (for Card Sharp joker)
+        self.round_state.hands_played_this_round.insert(best.rank);
+
+        // Track consecutive hands without face cards (for Ride the Bus joker)
+        let has_face_card = self.available.selected().iter().any(|c| c.is_face());
+        if has_face_card {
+            self.round_state.consecutive_hands_without_faces = 0;
+        } else {
+            self.round_state.consecutive_hands_without_faces += 1;
+        }
+
         let score = self.calc_score(best.clone());
+
+        // Trigger stateful joker updates for hand played (Green Joker)
+        for joker in &mut self.jokers {
+            if let crate::joker::Jokers::GreenJoker(ref mut j) = joker {
+                j.on_hand_played();
+            }
+        }
 
         // The Eye: track this hand rank
         if let Some(modifier) = self.stage.boss_modifier() {
@@ -329,7 +414,16 @@ impl Game {
         }
 
         let clear_blind = self.handle_score(score)?;
-        self.discarded.extend(self.available.selected());
+        let selected_cards = self.available.selected();
+        self.discarded.extend(selected_cards.clone());
+
+        // Remove played cards from hand tracking
+        for card in &selected_cards {
+            if let Some(pos) = self.hand.iter().position(|c| c == card) {
+                self.hand.remove(pos);
+            }
+        }
+
         let removed = self.available.remove_selected();
 
         // The Hook: discard random cards after play (before drawing)
@@ -359,7 +453,30 @@ impl Game {
         }
         self.discards -= 1;
         self.discards_used += 1; // Track for Garbage Tag
-        self.discarded.extend(self.available.selected());
+        let selected_cards = self.available.selected();
+        self.discarded.extend(selected_cards.clone());
+
+        // Trigger stateful joker updates for discard used
+        let discard_count = selected_cards.len();
+        for joker in &mut self.jokers {
+            match joker {
+                crate::joker::Jokers::GreenJoker(ref mut j) => {
+                    j.on_discard_used();
+                }
+                crate::joker::Jokers::Yorick(ref mut j) => {
+                    j.on_cards_discarded(discard_count);
+                }
+                _ => {}
+            }
+        }
+
+        // Remove discarded cards from hand tracking
+        for card in &selected_cards {
+            if let Some(pos) = self.hand.iter().position(|c| c == card) {
+                self.hand.remove(pos);
+            }
+        }
+
         let removed = self.available.remove_selected();
         self.draw(removed);
         return Ok(());
@@ -1340,6 +1457,9 @@ impl Game {
                 self.allowed_hand_rank = Some(*all_hand_ranks.choose(&mut rand::thread_rng()).unwrap());
             }
         }
+
+        // Reset and randomize RoundState for jokers that need per-round state
+        self.reset_round_state();
 
         self.stage = Stage::Blind(blind, boss_modifier);
 
