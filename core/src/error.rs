@@ -2,7 +2,7 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use thiserror::Error;
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, PartialEq)]
 pub enum PlayHandError {
     #[error("Played hand contains more than 5 cards")]
     TooManyCards,
@@ -12,7 +12,7 @@ pub enum PlayHandError {
     UnknownHand,
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, PartialEq)]
 pub enum GameError {
     #[error("No remaining discards")]
     NoRemainingDiscards,
