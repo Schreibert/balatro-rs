@@ -11,6 +11,11 @@ impl Deck {
     pub fn new() -> Self {
         Self { cards: Vec::new() }
     }
+
+    /// Create an empty deck (alias for new())
+    pub fn empty() -> Self {
+        Self::new()
+    }
     pub(crate) fn draw(&mut self, n: usize) -> Option<Vec<Card>> {
         if self.cards.len() < n {
             return None;
@@ -35,6 +40,30 @@ impl Deck {
 
     pub fn cards(&self) -> Vec<Card> {
         self.cards.clone()
+    }
+
+    /// Remove a specific card from the deck (for destruction, etc.)
+    pub(crate) fn remove_card(&mut self, card: Card) {
+        if let Some(index) = self.cards.iter().position(|c| c.id == card.id) {
+            self.cards.remove(index);
+        }
+    }
+
+    /// Modify a card in the deck by its ID (for Tarot effects)
+    pub(crate) fn modify_card<F>(&mut self, card_id: usize, f: F) -> bool
+    where
+        F: FnOnce(&mut Card),
+    {
+        if let Some(card) = self.cards.iter_mut().find(|c| c.id == card_id) {
+            f(card);
+            return true;
+        }
+        false
+    }
+
+    /// Add a card to the deck (for Tarot/Spectral generation effects)
+    pub(crate) fn add_card(&mut self, card: Card) {
+        self.cards.push(card);
     }
 
     // // Loops through cards, assigning index to each equal to index in deck
