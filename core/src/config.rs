@@ -1,9 +1,10 @@
+use crate::alternative_deck::DeckType;
 use pyo3::prelude::*;
 
 const DEFAULT_ROUND_START: usize = 0;
 const DEFAULT_PLAYS: usize = 4;
 const DEFAULT_DISCARDS: usize = 4;
-const DEFAULT_MONEY_START: usize = 0;
+const DEFAULT_MONEY_START: usize = 4; // Changed to match Balatro default $4
 const DEFAULT_MONEY_MAX: usize = 500;
 const DEFAULT_REWARD_BASE: usize = 0;
 const DEFAULT_MONEY_PER_HAND: usize = 1;
@@ -16,6 +17,8 @@ const DEFAULT_ANTE_START: usize = 1;
 const DEFAULT_ANTE_END: usize = 8;
 const DEFAULT_JOKER_SLOTS: usize = 5;
 const DEFAULT_JOKER_SLOTS_MAX: usize = 10;
+const DEFAULT_CONSUMABLE_SLOTS: usize = 2;
+const DEFAULT_CONSUMABLE_SLOTS_MAX: usize = 4;
 const DEFAULT_AVAILABLE: usize = 8;
 const DEFAULT_AVAILABLE_MAX: usize = 24; // arbitrary
 const DEFAULT_STORE_CONSUMABLE_SLOTS_MAX: usize = 4;
@@ -43,12 +46,15 @@ pub struct Config {
     pub ante_end: usize,
     pub joker_slots: usize,
     pub joker_slots_max: usize,
+    pub consumable_slots: usize,
+    pub consumable_slots_max: usize,
     pub selected_max: usize,
     pub available: usize,
     pub available_max: usize,
     pub store_consumable_slots_max: usize,
     pub deck_max: usize,
     pub discarded_max: usize,
+    pub deck_type: Option<DeckType>, // None = standard 52-card deck
 }
 
 impl Config {
@@ -70,13 +76,25 @@ impl Config {
             ante_end: DEFAULT_ANTE_END,
             joker_slots: DEFAULT_JOKER_SLOTS,
             joker_slots_max: DEFAULT_JOKER_SLOTS_MAX,
+            consumable_slots: DEFAULT_CONSUMABLE_SLOTS,
+            consumable_slots_max: DEFAULT_CONSUMABLE_SLOTS_MAX,
             selected_max: DEFAULT_SELECTED_MAX,
             available: DEFAULT_AVAILABLE,
             available_max: DEFAULT_AVAILABLE_MAX,
             store_consumable_slots_max: DEFAULT_STORE_CONSUMABLE_SLOTS_MAX,
             deck_max: DEFAULT_DECK_MAX,
             discarded_max: DEFAULT_DISCARDED_MAX,
+            deck_type: None, // Standard deck by default
         };
+    }
+
+    /// Create a config for a specific deck type
+    pub fn with_deck(deck_type: DeckType) -> Self {
+        let mut config = Self::new();
+        config.deck_type = Some(deck_type);
+        // Apply deck-specific modifiers
+        deck_type.apply_to_config(&mut config);
+        config
     }
 }
 
