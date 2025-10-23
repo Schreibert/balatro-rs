@@ -37,7 +37,12 @@ pub struct SelectHand(Vec<Card>);
 
 impl SelectHand {
     pub fn new(cards: Vec<Card>) -> Self {
-        Self(cards)
+        // Filter out face-down cards - they don't participate in hand detection
+        // Face-down cards are invisible for The Ox and The Wheel boss modifiers
+        let visible_cards: Vec<Card> = cards.into_iter()
+            .filter(|c| c.is_visible())
+            .collect();
+        Self(visible_cards)
     }
     pub(crate) fn len(&self) -> usize {
         self.0.len()
