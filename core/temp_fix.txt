@@ -1,0 +1,8 @@
+Line 838: game.hand doesn't exist - comment out
+Line 1183: game.stage.current_hand_rank() doesn't exist - comment out  
+Line 1185: Level.1 doesn't exist (use Level.level instead)
+Line 1353: game.deck.cards should be game.deck.cards()
+Line 1554: g.mult_mult doesn't exist - comment out
+Line 1937: game.hand doesn't exist - comment out
+Line 2028: g.mult_mult doesn't exist - comment out
+Line 2057: game.hand doesn't exist - comment out
