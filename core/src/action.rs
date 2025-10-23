@@ -1,4 +1,5 @@
 use crate::card::Card;
+use crate::consumable::Consumables;
 use crate::joker::Jokers;
 use crate::stage::Blind;
 use pyo3::pyclass;
@@ -35,9 +36,12 @@ pub enum Action {
     Discard(),
     CashOut(usize),
     BuyJoker(Jokers),
+    BuyConsumable(Consumables),
+    UseConsumable(Consumables, Option<Vec<Card>>),
     NextRound(),
     SelectBlind(Blind),
-    // SkipBlind(Blind),
+    SkipBlind(), // Skip Small or Big blind for a tag
+    SelectFromTagPack(usize), // Select an item from a pending tag pack by index
 }
 
 impl fmt::Display for Action {
@@ -61,11 +65,32 @@ impl fmt::Display for Action {
             Self::BuyJoker(joker) => {
                 write!(f, "BuyJoker: {}", joker)
             }
+            Self::BuyConsumable(consumable) => {
+                write!(f, "BuyConsumable: {}", consumable)
+            }
+            Self::UseConsumable(consumable, targets) => {
+                if let Some(cards) = targets {
+                    write!(
+                        f,
+                        "UseConsumable: {} on {} cards",
+                        consumable,
+                        cards.len()
+                    )
+                } else {
+                    write!(f, "UseConsumable: {}", consumable)
+                }
+            }
             Self::NextRound() => {
                 write!(f, "NextRound")
             }
             Self::SelectBlind(blind) => {
                 write!(f, "SelectBlind: {}", blind)
+            }
+            Self::SkipBlind() => {
+                write!(f, "SkipBlind")
+            }
+            Self::SelectFromTagPack(index) => {
+                write!(f, "SelectFromTagPack: index {}", index)
             }
         }
     }
