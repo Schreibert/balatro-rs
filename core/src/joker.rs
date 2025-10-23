@@ -1413,16 +1413,44 @@ impl Joker for SixthSense {
 }
 
 // Joker #37: Constellation - Stateful
-#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "python", pyclass(eq))]
-pub struct Constellation {}
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass)]
+pub struct Constellation {
+    pub planet_cards_used: usize,
+    pub bonus_mult: f32,
+}
+
+impl Default for Constellation {
+    fn default() -> Self {
+        Self {
+            planet_cards_used: 0,
+            bonus_mult: 1.0,
+        }
+    }
+}
+
+impl Eq for Constellation {}
+
+impl std::hash::Hash for Constellation {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.planet_cards_used.hash(state);
+        self.bonus_mult.to_bits().hash(state);
+    }
+}
+
+impl Constellation {
+    pub fn on_planet_used(&mut self) {
+        self.planet_cards_used += 1;
+        self.bonus_mult = 1.0 + (self.planet_cards_used as f32 * 0.1);
+    }
+}
 
 impl Joker for Constellation {
     fn name(&self) -> String {
         "Constellation".to_string()
     }
     fn desc(&self) -> String {
-        "Gains X0.1 Mult per Planet card used".to_string()
+        format!("X{:.1} Mult ({} Planet cards used)", self.bonus_mult, self.planet_cards_used)
     }
     fn cost(&self) -> usize {
         6
@@ -1433,9 +1461,16 @@ impl Joker for Constellation {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultMult]
     }
-    fn effects(&self, _in: &Game) -> Vec<Effects> {
-        // Stateful - would need to track planet cards used
-        vec![]
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        let mult_multiplier = self.bonus_mult;
+
+        fn apply(g: &mut Game, _hand: MadeHand, multiplier: f32) {
+            g.mult = (g.mult as f32 * multiplier) as usize;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_multiplier);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -1616,14 +1651,22 @@ impl Joker for Cavendish {
 // Joker #43: Red Card - Triggers on pack skip
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "python", pyclass(eq))]
-pub struct RedCard {}
+pub struct RedCard {
+    pub bonus_mult: usize,
+}
+
+impl RedCard {
+    pub fn on_booster_skipped(&mut self) {
+        self.bonus_mult += 3;
+    }
+}
 
 impl Joker for RedCard {
     fn name(&self) -> String {
         "Red Card".to_string()
     }
     fn desc(&self) -> String {
-        "Gains +3 Mult when any Booster Pack is skipped".to_string()
+        format!("+{} Mult (gains +3 when Booster Pack skipped)", self.bonus_mult)
     }
     fn cost(&self) -> usize {
         5
@@ -1634,9 +1677,16 @@ impl Joker for RedCard {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultPlus]
     }
-    fn effects(&self, _in: &Game) -> Vec<Effects> {
-        // Stateful - needs game event handling
-        vec![]
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        let mult_bonus = self.bonus_mult;
+
+        fn apply(g: &mut Game, _hand: MadeHand, bonus: usize) {
+            g.mult += bonus;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_bonus);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
@@ -2003,14 +2053,22 @@ impl Joker for ShootTheMoon {
 // Joker #56: Fortune Teller - Stateful
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "python", pyclass(eq))]
-pub struct FortuneTeller {}
+pub struct FortuneTeller {
+    pub tarot_cards_used: usize,
+}
+
+impl FortuneTeller {
+    pub fn on_tarot_used(&mut self) {
+        self.tarot_cards_used += 1;
+    }
+}
 
 impl Joker for FortuneTeller {
     fn name(&self) -> String {
         "Fortune Teller".to_string()
     }
     fn desc(&self) -> String {
-        "+1 Mult per Tarot card used this run".to_string()
+        format!("+{} Mult ({} Tarot cards used)", self.tarot_cards_used, self.tarot_cards_used)
     }
     fn cost(&self) -> usize {
         5
@@ -2021,8 +2079,16 @@ impl Joker for FortuneTeller {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultPlus]
     }
-    fn effects(&self, _in: &Game) -> Vec<Effects> {
-        vec![]
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        let mult_bonus = self.tarot_cards_used;
+
+        fn apply(g: &mut Game, _hand: MadeHand, bonus: usize) {
+            g.mult += bonus;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_bonus);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
     }
 }
 
