@@ -9,6 +9,7 @@ use pyo3::pyclass;
 // Given constraints:
 // available max = 24
 // store consumable slots max = 4
+// consumable slots max = 4
 //
 // 0-23: select card
 // 24-46: move card (left)
@@ -17,10 +18,12 @@ use pyo3::pyclass;
 // 71: discard
 // 72: cashout
 // 73-76: buy joker
-// 77: next round
-// 78: select blind
+// 77-80: buy consumable
+// 81-84: use consumable
+// 85: next round
+// 86: select blind
 //
-// We end up with a vector of length 79 (so far) where each index
+// We end up with a vector of length 87 (so far) where each index
 // represents a potential action.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "python", pyclass(eq))]
@@ -33,6 +36,8 @@ pub struct ActionSpace {
     pub discard: Vec<usize>,
     pub cash_out: Vec<usize>,
     pub buy_joker: Vec<usize>,
+    pub buy_consumable: Vec<usize>,
+    pub use_consumable: Vec<usize>,
     pub next_round: Vec<usize>,
     pub select_blind: Vec<usize>,
 }
@@ -46,6 +51,8 @@ impl ActionSpace {
             + self.discard.len()
             + self.cash_out.len()
             + self.buy_joker.len()
+            + self.buy_consumable.len()
+            + self.use_consumable.len()
             + self.next_round.len()
             + self.select_blind.len();
     }
@@ -106,8 +113,24 @@ impl ActionSpace {
         return self.buy_joker_min() + self.buy_joker.len() - 1;
     }
 
-    fn next_round_min(&self) -> usize {
+    fn buy_consumable_min(&self) -> usize {
         return self.buy_joker_max() + 1;
+    }
+
+    fn buy_consumable_max(&self) -> usize {
+        return self.buy_consumable_min() + self.buy_consumable.len() - 1;
+    }
+
+    fn use_consumable_min(&self) -> usize {
+        return self.buy_consumable_max() + 1;
+    }
+
+    fn use_consumable_max(&self) -> usize {
+        return self.use_consumable_min() + self.use_consumable.len() - 1;
+    }
+
+    fn next_round_min(&self) -> usize {
+        return self.use_consumable_max() + 1;
     }
 
     fn next_round_max(&self) -> usize {
@@ -165,6 +188,22 @@ impl ActionSpace {
             return Err(ActionSpaceError::InvalidIndex);
         }
         self.buy_joker[i] = 1;
+        return Ok(());
+    }
+
+    pub(crate) fn unmask_buy_consumable(&mut self, i: usize) -> Result<(), ActionSpaceError> {
+        if i >= self.buy_consumable.len() {
+            return Err(ActionSpaceError::InvalidIndex);
+        }
+        self.buy_consumable[i] = 1;
+        return Ok(());
+    }
+
+    pub(crate) fn unmask_use_consumable(&mut self, i: usize) -> Result<(), ActionSpaceError> {
+        if i >= self.use_consumable.len() {
+            return Err(ActionSpaceError::InvalidIndex);
+        }
+        self.use_consumable[i] = 1;
         return Ok(());
     }
 
@@ -228,6 +267,24 @@ impl ActionSpace {
                     return Err(ActionSpaceError::InvalidActionConversion);
                 }
             }
+            n if (self.buy_consumable_min()..=self.buy_consumable_max()).contains(&n) => {
+                let n_offset = n - self.buy_consumable_min();
+                if let Some(consumable) = game.shop.consumable_from_index(n_offset) {
+                    return Ok(Action::BuyConsumable(consumable));
+                } else {
+                    return Err(ActionSpaceError::InvalidActionConversion);
+                }
+            }
+            n if (self.use_consumable_min()..=self.use_consumable_max()).contains(&n) => {
+                let n_offset = n - self.use_consumable_min();
+                if let Some(consumable) = game.consumable_from_index(n_offset) {
+                    // For now, use consumables without targets
+                    // TODO: Handle targeted consumables
+                    return Ok(Action::UseConsumable(consumable, None));
+                } else {
+                    return Err(ActionSpaceError::InvalidActionConversion);
+                }
+            }
             n if (self.next_round_min()..=self.next_round_max()).contains(&n) => {
                 return Ok(Action::NextRound());
             }
@@ -250,6 +307,8 @@ impl ActionSpace {
             self.discard.clone(),
             self.cash_out.clone(),
             self.buy_joker.clone(),
+            self.buy_consumable.clone(),
+            self.use_consumable.clone(),
             self.next_round.clone(),
             self.select_blind.clone(),
         ]
@@ -273,6 +332,8 @@ impl From<Config> for ActionSpace {
             discard: vec![0; 1],
             cash_out: vec![0; 1],
             buy_joker: vec![0; c.store_consumable_slots_max],
+            buy_consumable: vec![0; c.store_consumable_slots_max],
+            use_consumable: vec![0; c.consumable_slots_max],
             next_round: vec![0; 1],
             select_blind: vec![0; 1],
         };
@@ -290,6 +351,8 @@ impl From<ActionSpace> for Vec<usize> {
             a.discard,
             a.cash_out,
             a.buy_joker,
+            a.buy_consumable,
+            a.use_consumable,
             a.next_round,
             a.select_blind,
         ]
