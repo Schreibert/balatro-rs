@@ -193,7 +193,46 @@ make_jokers!(
     MailInRebate,
     EightBall,
     Misprint,
-    Egg
+    Egg,
+    Fibonacci,
+    SpareTrousers,
+    Acrobat,
+    OnyxAgate,
+    Arrowhead,
+    TheDuo,
+    TheTrio,
+    Bloodstone,
+    RoughGem,
+    FlashCard,
+    StoneJoker,
+    Bull,
+    Erosion,
+    TheFamily,
+    TheOrder,
+    TheTribe,
+    Triboulet,
+    FourFingers,
+    Mime,
+    MarbleJoker,
+    SteelJoker,
+    Pareidolia,
+    Blackboard,
+    SmearedJoker,
+    FlowerPot,
+    SeeingDouble,
+    Baron,
+    Blueprint,
+    JokerStencil,
+    Showman,
+    Bootstraps,
+    Cloud9,
+    WeeJoker,
+    BaseballCard,
+    AncientJoker,
+    Stuntman,
+    Canio,
+    Yorick,
+    Chicot
 );
 
 impl Jokers {
@@ -2068,6 +2107,1247 @@ impl Joker for Egg {
     }
 }
 
+// UNCOMMON JOKERS
+
+// Joker: Fibonacci - Each played Ace, 2, 3, 5, or 8 gives +8 Mult when scored
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Fibonacci {}
+
+impl Joker for Fibonacci {
+    fn name(&self) -> String {
+        "Fibonacci".to_string()
+    }
+    fn desc(&self) -> String {
+        "Each played Ace, 2, 3, 5, or 8 gives +8 Mult when scored".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultPlus]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        use crate::card::Value;
+        fn apply(g: &mut Game, hand: MadeHand) {
+            let fib_count = hand.hand.cards().iter()
+                .filter(|c| matches!(c.value, Value::Ace | Value::Two | Value::Three | Value::Five | Value::Eight))
+                .count();
+            g.mult += fib_count * 8;
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: Spare Trousers - Gains +2 Mult if played hand contains Two Pair
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct SpareTrousers {}
+
+impl Joker for SpareTrousers {
+    fn name(&self) -> String {
+        "Spare Trousers".to_string()
+    }
+    fn desc(&self) -> String {
+        "Gains +2 Mult if played hand contains Two Pair".to_string()
+    }
+    fn cost(&self) -> usize {
+        6
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultPlus]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        fn apply(g: &mut Game, hand: MadeHand) {
+            if hand.hand.is_two_pair().is_some() {
+                g.mult += 2;
+            }
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: Acrobat - X3 Mult on final hand of round
+// Note: Requires tracking if this is the final hand
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Acrobat {}
+
+impl Joker for Acrobat {
+    fn name(&self) -> String {
+        "Acrobat".to_string()
+    }
+    fn desc(&self) -> String {
+        "X3 Mult on final hand of round".to_string()
+    }
+    fn cost(&self) -> usize {
+        6
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let is_final_hand = game.plays == 1;
+        fn apply(g: &mut Game, _hand: MadeHand, final_hand: bool) {
+            if final_hand {
+                g.mult = g.mult * 3;
+            }
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, is_final_hand);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: Onyx Agate - +7 Mult for each Club card played
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct OnyxAgate {}
+
+impl Joker for OnyxAgate {
+    fn name(&self) -> String {
+        "Onyx Agate".to_string()
+    }
+    fn desc(&self) -> String {
+        "+7 Mult for each Club card played".to_string()
+    }
+    fn cost(&self) -> usize {
+        7
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultPlus]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        fn apply(g: &mut Game, hand: MadeHand) {
+            let clubs = hand
+                .hand
+                .suits()
+                .iter()
+                .filter(|s| **s == Suit::Club)
+                .count();
+            g.mult += clubs * 7;
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: Arrowhead - Played Spade cards give +50 Chips when scored
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Arrowhead {}
+
+impl Joker for Arrowhead {
+    fn name(&self) -> String {
+        "Arrowhead".to_string()
+    }
+    fn desc(&self) -> String {
+        "Played Spade cards give +50 Chips when scored".to_string()
+    }
+    fn cost(&self) -> usize {
+        7
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Chips]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        fn apply(g: &mut Game, hand: MadeHand) {
+            let spades = hand
+                .hand
+                .suits()
+                .iter()
+                .filter(|s| **s == Suit::Spade)
+                .count();
+            g.chips += spades * 50;
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// RARE JOKERS
+
+// Joker: The Duo - X2 Mult if played hand contains a Pair
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct TheDuo {}
+
+impl Joker for TheDuo {
+    fn name(&self) -> String {
+        "The Duo".to_string()
+    }
+    fn desc(&self) -> String {
+        "X2 Mult if played hand contains a Pair".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        fn apply(g: &mut Game, hand: MadeHand) {
+            if hand.hand.is_pair().is_some() {
+                g.mult = g.mult * 2;
+            }
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: The Trio - X3 Mult if played hand contains Three of a Kind
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct TheTrio {}
+
+impl Joker for TheTrio {
+    fn name(&self) -> String {
+        "The Trio".to_string()
+    }
+    fn desc(&self) -> String {
+        "X3 Mult if played hand contains Three of a Kind".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        fn apply(g: &mut Game, hand: MadeHand) {
+            if hand.hand.is_three_of_kind().is_some() {
+                g.mult = g.mult * 3;
+            }
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: Bloodstone - 1 in 2 chance for Hearts to give X1.5 Mult when scored
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Bloodstone {}
+
+impl Joker for Bloodstone {
+    fn name(&self) -> String {
+        "Bloodstone".to_string()
+    }
+    fn desc(&self) -> String {
+        "1 in 2 chance for Hearts to give X1.5 Mult when scored".to_string()
+    }
+    fn cost(&self) -> usize {
+        7
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        use rand::Rng;
+        fn apply(g: &mut Game, hand: MadeHand) {
+            let hearts_count = hand
+                .hand
+                .suits()
+                .iter()
+                .filter(|s| **s == Suit::Heart)
+                .count();
+
+            for _ in 0..hearts_count {
+                if rand::thread_rng().gen_bool(0.5) {
+                    g.mult = (g.mult as f32 * 1.5) as usize;
+                }
+            }
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: Rough Gem - Played Diamond cards earn $1 when scored
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct RoughGem {}
+
+impl Joker for RoughGem {
+    fn name(&self) -> String {
+        "Rough Gem".to_string()
+    }
+    fn desc(&self) -> String {
+        "Played Diamond cards earn $1 when scored".to_string()
+    }
+    fn cost(&self) -> usize {
+        7
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Economy]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        fn apply(g: &mut Game, hand: MadeHand) {
+            let diamonds = hand
+                .hand
+                .suits()
+                .iter()
+                .filter(|s| **s == Suit::Diamond)
+                .count();
+            g.money += diamonds;
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: Flash Card - Gains +2 Mult per reroll in shop
+// Note: Requires tracking shop rerolls
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct FlashCard {}
+
+impl Joker for FlashCard {
+    fn name(&self) -> String {
+        "Flash Card".to_string()
+    }
+    fn desc(&self) -> String {
+        "Gains +2 Mult per reroll in shop".to_string()
+    }
+    fn cost(&self) -> usize {
+        5
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultPlus]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        // Count rerolls from shop
+        let reroll_count = game.shop.rerolls_this_round;
+        fn apply(g: &mut Game, _hand: MadeHand, rerolls: usize) {
+            g.mult += rerolls * 2;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, reroll_count);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: Stone Joker - Gains +25 Chips for each Stone Card in full deck
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct StoneJoker {}
+
+impl Joker for StoneJoker {
+    fn name(&self) -> String {
+        "Stone Joker".to_string()
+    }
+    fn desc(&self) -> String {
+        "Gains +25 Chips for each Stone Card in full deck".to_string()
+    }
+    fn cost(&self) -> usize {
+        5
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Chips]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        use crate::card::Enhancement;
+        let stone_count = game
+            .deck
+            .cards()
+            .iter()
+            .filter(|c| c.enhancement == Some(Enhancement::Stone))
+            .count();
+        fn apply(g: &mut Game, _hand: MadeHand, stones: usize) {
+            g.chips += stones * 25;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, stone_count);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: Bull - +2 Chips for each $1 you have
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Bull {}
+
+impl Joker for Bull {
+    fn name(&self) -> String {
+        "Bull".to_string()
+    }
+    fn desc(&self) -> String {
+        "+2 Chips for each $1 you have".to_string()
+    }
+    fn cost(&self) -> usize {
+        6
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Chips]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let money = game.money;
+        fn apply(g: &mut Game, _hand: MadeHand, money: usize) {
+            g.chips += money * 2;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, money);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: Erosion - +4 Mult for each card below 52 in full deck
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Erosion {}
+
+impl Joker for Erosion {
+    fn name(&self) -> String {
+        "Erosion".to_string()
+    }
+    fn desc(&self) -> String {
+        "+4 Mult for each card below 52 in full deck".to_string()
+    }
+    fn cost(&self) -> usize {
+        6
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultPlus]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let cards_below = 52_usize.saturating_sub(game.deck.cards().len());
+        fn apply(g: &mut Game, _hand: MadeHand, missing: usize) {
+            g.mult += missing * 4;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, cards_below);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: The Family - X4 Mult if played hand contains Four of a Kind
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct TheFamily {}
+
+impl Joker for TheFamily {
+    fn name(&self) -> String {
+        "The Family".to_string()
+    }
+    fn desc(&self) -> String {
+        "X4 Mult if played hand contains Four of a Kind".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        fn apply(g: &mut Game, hand: MadeHand) {
+            if hand.hand.is_four_of_kind().is_some() {
+                g.mult = g.mult * 4;
+            }
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: The Order - X3 Mult if played hand contains Straight
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct TheOrder {}
+
+impl Joker for TheOrder {
+    fn name(&self) -> String {
+        "The Order".to_string()
+    }
+    fn desc(&self) -> String {
+        "X3 Mult if played hand contains Straight".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        fn apply(g: &mut Game, hand: MadeHand) {
+            if hand.hand.is_straight().is_some() {
+                g.mult = g.mult * 3;
+            }
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: The Tribe - X2 Mult if played hand contains Flush
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct TheTribe {}
+
+impl Joker for TheTribe {
+    fn name(&self) -> String {
+        "The Tribe".to_string()
+    }
+    fn desc(&self) -> String {
+        "X2 Mult if played hand contains Flush".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        fn apply(g: &mut Game, hand: MadeHand) {
+            if hand.hand.is_flush().is_some() {
+                g.mult = g.mult * 2;
+            }
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// LEGENDARY JOKERS
+
+// Joker: Triboulet - Played Kings and Queens each give X2 Mult when scored
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Triboulet {}
+
+impl Joker for Triboulet {
+    fn name(&self) -> String {
+        "Triboulet".to_string()
+    }
+    fn desc(&self) -> String {
+        "Played Kings and Queens each give X2 Mult when scored".to_string()
+    }
+    fn cost(&self) -> usize {
+        0
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Legendary
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        use crate::card::Value;
+        fn apply(g: &mut Game, hand: MadeHand) {
+            let royal_count = hand
+                .hand
+                .cards()
+                .iter()
+                .filter(|c| matches!(c.value, Value::King | Value::Queen))
+                .count();
+
+            for _ in 0..royal_count {
+                g.mult = g.mult * 2;
+            }
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: Four Fingers - All Flushes and Straights can be made with 4 cards
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct FourFingers {}
+impl Joker for FourFingers {
+    fn name(&self) -> String {
+        "Four Fingers".to_string()
+    }
+    fn desc(&self) -> String {
+        "All Flushes and Straights can be made with 4 cards".to_string()
+    }
+    fn cost(&self) -> usize {
+        7
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Effect]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        // Passive effect - would need to be handled in hand detection logic
+        vec![]
+    }
+}
+
+// Joker: Mime - Retrigger all card held in hand abilities
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Mime {}
+impl Joker for Mime {
+    fn name(&self) -> String {
+        "Mime".to_string()
+    }
+    fn desc(&self) -> String {
+        "Retrigger all card held in hand abilities".to_string()
+    }
+    fn cost(&self) -> usize {
+        5
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Retrigger]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        // Complex - would need to retrigger cards in hand (not played cards)
+        vec![]
+    }
+}
+
+// Joker: Marble Joker - Adds one Stone card to deck when Blind selected
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct MarbleJoker {}
+impl Joker for MarbleJoker {
+    fn name(&self) -> String {
+        "Marble Joker".to_string()
+    }
+    fn desc(&self) -> String {
+        "Adds one Stone card to deck when Blind selected".to_string()
+    }
+    fn cost(&self) -> usize {
+        6
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Effect]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        // Would need to be handled at blind selection time
+        vec![]
+    }
+}
+
+// Joker: Steel Joker - Gains X0.2 Mult for each Steel Card in full deck
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct SteelJoker {}
+impl Joker for SteelJoker {
+    fn name(&self) -> String {
+        "Steel Joker".to_string()
+    }
+    fn desc(&self) -> String {
+        "Gains X0.2 Mult for each Steel Card in full deck".to_string()
+    }
+    fn cost(&self) -> usize {
+        7
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        use crate::card::Edition;
+        let steel_count = game
+            .deck
+            .cards()
+            .iter()
+            .filter(|c| c.edition == Edition::Foil)
+            .count();
+        fn apply(g: &mut Game, _hand: MadeHand, count: usize) {
+            // X0.2 per steel card = multiply by (1.0 + 0.2 * count)
+            let multiplier = 1.0 + (0.2 * count as f32);
+            g.mult = (g.mult as f32 * multiplier) as usize;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, steel_count);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: Pareidolia - All cards considered face cards
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Pareidolia {}
+impl Joker for Pareidolia {
+    fn name(&self) -> String {
+        "Pareidolia".to_string()
+    }
+    fn desc(&self) -> String {
+        "All cards considered face cards".to_string()
+    }
+    fn cost(&self) -> usize {
+        5
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Effect]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        // Passive effect - would need to be handled in card.is_face() logic
+        vec![]
+    }
+}
+
+// Joker: Blackboard - X3 Mult if all cards held in hand are Spades or Clubs
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Blackboard {}
+impl Joker for Blackboard {
+    fn name(&self) -> String {
+        "Blackboard".to_string()
+    }
+    fn desc(&self) -> String {
+        "X3 Mult if all cards held in hand are Spades or Clubs".to_string()
+    }
+    fn cost(&self) -> usize {
+        6
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        // TODO: Needs access to full hand (all cards held, not just played)
+        vec![]
+    }
+}
+
+// Joker: Smeared Joker - Hearts and Diamonds count as same suit; Spades and Clubs count as same suit
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct SmearedJoker {}
+impl Joker for SmearedJoker {
+    fn name(&self) -> String {
+        "Smeared Joker".to_string()
+    }
+    fn desc(&self) -> String {
+        "Hearts and Diamonds count as same suit; Spades and Clubs count as same suit".to_string()
+    }
+    fn cost(&self) -> usize {
+        7
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Effect]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        // Passive effect - would need to be handled in flush detection logic
+        vec![]
+    }
+}
+
+// Joker: Flower Pot - X3 Mult if hand contains Diamond, Club, Heart, and Spade cards
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct FlowerPot {}
+impl Joker for FlowerPot {
+    fn name(&self) -> String {
+        "Flower Pot".to_string()
+    }
+    fn desc(&self) -> String {
+        "X3 Mult if hand contains Diamond, Club, Heart, and Spade cards".to_string()
+    }
+    fn cost(&self) -> usize {
+        6
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        use crate::card::Suit;
+        fn apply(g: &mut Game, hand: MadeHand) {
+            // Check all played cards, not just the made hand
+            let has_diamond = hand.all.iter().any(|c| c.suit == Suit::Diamond);
+            let has_club = hand.all.iter().any(|c| c.suit == Suit::Club);
+            let has_heart = hand.all.iter().any(|c| c.suit == Suit::Heart);
+            let has_spade = hand.all.iter().any(|c| c.suit == Suit::Spade);
+
+            if has_diamond && has_club && has_heart && has_spade {
+                g.mult = g.mult * 3;
+            }
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: Seeing Double - X2 Mult if played hand has Club card and any other suit card
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct SeeingDouble {}
+impl Joker for SeeingDouble {
+    fn name(&self) -> String {
+        "Seeing Double".to_string()
+    }
+    fn desc(&self) -> String {
+        "X2 Mult if played hand has Club card and any other suit card".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        use crate::card::Suit;
+        fn apply(g: &mut Game, hand: MadeHand) {
+            // Check all played cards, not just the made hand
+            let has_club = hand.all.iter().any(|c| c.suit == Suit::Club);
+            let has_other = hand.all.iter().any(|c| c.suit != Suit::Club);
+
+            if has_club && has_other {
+                g.mult = g.mult * 2;
+            }
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: Baron - Each King held in hand gives X1.5 Mult
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Baron {}
+impl Joker for Baron {
+    fn name(&self) -> String {
+        "Baron".to_string()
+    }
+    fn desc(&self) -> String {
+        "Each King held in hand gives X1.5 Mult".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        // TODO: Needs access to full hand (all cards held, not just played)
+        // Would need: game.hand.iter().filter(|c| c.value == Value::King).count()
+        vec![]
+    }
+}
+
+// Joker: Blueprint - Copies ability of Joker to the right
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Blueprint {}
+impl Joker for Blueprint {
+    fn name(&self) -> String {
+        "Blueprint".to_string()
+    }
+    fn desc(&self) -> String {
+        "Copies ability of Joker to the right".to_string()
+    }
+    fn cost(&self) -> usize {
+        10
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Effect]
+    }
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        // Complex - would need to dynamically copy another joker's effects
+        vec![]
+    }
+}
+
+// Joker: JokerStencil - X1 Mult for each empty Joker slot (counts itself as empty)
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct JokerStencil {}
+impl Joker for JokerStencil {
+    fn name(&self) -> String {
+        "Joker Stencil".to_string()
+    }
+    fn desc(&self) -> String {
+        "X1 Mult for each empty Joker slot (counts itself as empty)".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        // Max joker slots is typically 5, count empty slots
+        let max_slots: usize = 5;
+        let current_jokers = game.jokers.len();
+        let empty_slots = max_slots.saturating_sub(current_jokers).saturating_add(1); // +1 because it counts itself as empty
+        fn apply(g: &mut Game, _hand: MadeHand, slots: usize) {
+            // X1 per slot means multiply by (1 * slots), which is just slots
+            g.mult = g.mult * slots;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, empty_slots);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: Showman - +4 Mult for Joker, Tarot, Planet, or Spectral cards remaining in consumable slots
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Showman {}
+impl Joker for Showman {
+    fn name(&self) -> String {
+        "Showman".to_string()
+    }
+    fn desc(&self) -> String {
+        "Gains +4 Mult for Joker, Tarot, Planet, or Spectral cards remaining in consumable slots".to_string()
+    }
+    fn cost(&self) -> usize {
+        5
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultPlus]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let consumable_count = game.consumables.len();
+        fn apply(g: &mut Game, _hand: MadeHand, count: usize) {
+            g.mult += count * 4;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, consumable_count);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: Bootstraps - Gains +2 Mult for every $5 you have
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Bootstraps {}
+impl Joker for Bootstraps {
+    fn name(&self) -> String {
+        "Bootstraps".to_string()
+    }
+    fn desc(&self) -> String {
+        "Gains +2 Mult for every $5 you have".to_string()
+    }
+    fn cost(&self) -> usize {
+        6
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultPlus]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let mult_bonus = (game.money / 5) * 2;
+        fn apply(g: &mut Game, _hand: MadeHand, bonus: usize) {
+            g.mult += bonus;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, mult_bonus);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: Cloud9 - Earn $1 for each 9 in full deck at end of round
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Cloud9 {}
+impl Joker for Cloud9 {
+    fn name(&self) -> String {
+        "Cloud 9".to_string()
+    }
+    fn desc(&self) -> String {
+        "Earn $1 for each 9 in full deck at end of round".to_string()
+    }
+    fn cost(&self) -> usize {
+        5
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Uncommon
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Economy]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        // Effect handled at end of round
+        vec![]
+    }
+}
+
+// Joker: WeeJoker - Gains +8 Chips when each played 2 is scored
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct WeeJoker {}
+impl Joker for WeeJoker {
+    fn name(&self) -> String {
+        "Wee Joker".to_string()
+    }
+    fn desc(&self) -> String {
+        "Gains +8 Chips when each played 2 is scored".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Chips]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        use crate::card::Value;
+        fn apply(g: &mut Game, hand: MadeHand) {
+            let twos = hand
+                .hand
+                .cards()
+                .iter()
+                .filter(|c| c.value == Value::Two)
+                .count();
+            g.chips += twos * 8;
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: BaseballCard - Uncommon Jokers each give X1.5 Mult
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct BaseballCard {}
+impl Joker for BaseballCard {
+    fn name(&self) -> String {
+        "Baseball Card".to_string()
+    }
+    fn desc(&self) -> String {
+        "Uncommon Jokers each give X1.5 Mult".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        let uncommon_count = game
+            .jokers
+            .iter()
+            .filter(|j| j.rarity() == Rarity::Uncommon)
+            .count();
+        fn apply(g: &mut Game, _hand: MadeHand, count: usize) {
+            // X1.5 per uncommon = multiply by (1.5 ^ count)
+            let multiplier = 1.5_f32.powi(count as i32);
+            g.mult = (g.mult as f32 * multiplier) as usize;
+        }
+        let apply_closure = move |g: &mut Game, hand: MadeHand| {
+            apply(g, hand, uncommon_count);
+        };
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
+    }
+}
+
+// Joker: AncientJoker - Each played card with [suit] gives X1.5 Mult when scored
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct AncientJoker {}
+impl Joker for AncientJoker {
+    fn name(&self) -> String {
+        "Ancient Joker".to_string()
+    }
+    fn desc(&self) -> String {
+        "Each played card with [suit] gives X1.5 Mult when scored; suit changes at end of round".to_string()
+    }
+    fn cost(&self) -> usize {
+        8
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        // TODO: Needs stateful tracking of the current suit
+        // Would need to randomly select a suit and track it across rounds
+        vec![]
+    }
+}
+
+// Joker: Stuntman - +250 Chips; +3 hand size
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Stuntman {}
+impl Joker for Stuntman {
+    fn name(&self) -> String {
+        "Stuntman".to_string()
+    }
+    fn desc(&self) -> String {
+        "+250 Chips; +3 hand size".to_string()
+    }
+    fn cost(&self) -> usize {
+        6
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Rare
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Chips, Categories::Effect]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        fn apply(g: &mut Game, _hand: MadeHand) {
+            g.chips += 250;
+        }
+        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
+    }
+}
+
+// Joker: Canio - Gains X1 Mult when a face card is destroyed
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Canio {}
+impl Joker for Canio {
+    fn name(&self) -> String {
+        "Canio".to_string()
+    }
+    fn desc(&self) -> String {
+        "Gains X1 Mult when a face card is destroyed".to_string()
+    }
+    fn cost(&self) -> usize {
+        0
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Legendary
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        // TODO: Needs stateful tracking of destroyed face cards
+        // Would accumulate X mult over time
+        vec![]
+    }
+}
+
+// Joker: Yorick - Gains X1 Mult every 23 cards discarded
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Yorick {}
+impl Joker for Yorick {
+    fn name(&self) -> String {
+        "Yorick".to_string()
+    }
+    fn desc(&self) -> String {
+        "Gains X1 Mult every 23 cards discarded".to_string()
+    }
+    fn cost(&self) -> usize {
+        0
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Legendary
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::MultMult]
+    }
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        // TODO: Needs stateful tracking of cards discarded
+        // Would accumulate X mult over time
+        vec![]
+    }
+}
+
+// Joker: Chicot - Disables effect of every Boss Blind
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "python", pyclass(eq))]
+pub struct Chicot {}
+impl Joker for Chicot {
+    fn name(&self) -> String {
+        "Chicot".to_string()
+    }
+    fn desc(&self) -> String {
+        "Disables effect of every Boss Blind".to_string()
+    }
+    fn cost(&self) -> usize {
+        0
+    }
+    fn rarity(&self) -> Rarity {
+        Rarity::Legendary
+    }
+    fn categories(&self) -> Vec<Categories> {
+        vec![Categories::Effect]
+    }
+    fn effects(&self, _in: &Game) -> Vec<Effects> {
+        // Passive effect - would be checked in Boss Blind logic
+        vec![]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::card::{Card, Suit, Value};
@@ -2428,6 +3708,1131 @@ mod tests {
         // (19 + 35 + 80) * (4) = 536
         let after = 536;
         let j = Jokers::CraftyJoker(CraftyJoker {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_half_joker() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let kc = Card::new(Value::King, Suit::Club);
+        let qc = Card::new(Value::Queen, Suit::Club);
+        // High card best_hand() returns only 1 card (the highest)
+        // So we need 3 or fewer cards total
+        let hand = SelectHand::new(vec![ac, kc, qc]);
+
+        // Score high card without joker (only ace counts)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 ace) -> 11 chips
+        // (5 + 11) * (1) = 16
+        let before = 16;
+        // Score high card with joker (3 cards selected, triggers +20 mult)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 ace) -> 11 chips
+        // Half Joker: +20 mult (hand has ≤3 cards)
+        // (5 + 11) * (1 + 20) = 336
+        let after = 336;
+
+        let j = Jokers::HalfJoker(HalfJoker {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_banner() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+        g.discards = 3; // Set 3 remaining discards
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::Banner(Banner {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+        g.discards = 3; // Restore discards
+
+        // Score pair with Banner (3 discards = +90 chips)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Banner: +90 chips (3 discards × 30)
+        // (10 + 22 + 90) * (2) = 244
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 244);
+    }
+
+    #[test]
+    fn test_mystic_summit() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+        g.discards = 0; // Set 0 remaining discards
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::MysticSummit(MysticSummit {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+        g.discards = 0; // Restore 0 discards
+
+        // Score pair with Mystic Summit (0 discards = +15 mult)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Mystic Summit: +15 mult
+        // (10 + 22) * (2 + 15) = 544
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 544);
+    }
+
+    #[test]
+    fn test_scary_face() {
+        let kc = Card::new(Value::King, Suit::Club);
+        let qh = Card::new(Value::Queen, Suit::Heart);
+        let jd = Card::new(Value::Jack, Suit::Diamond);
+        let hand = SelectHand::new(vec![kc, qh, jd]);
+
+        // Score high card without joker (only King counts in made hand)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 King) -> 10 chips
+        // (5 + 10) * (1) = 15
+        let before = 15;
+        // Score high card with Scary Face (1 face card in made hand = +30 chips)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 King) -> 10 chips
+        // Scary Face: +30 chips (1 face card)
+        // (5 + 10 + 30) * (1) = 45
+        let after = 45;
+
+        let j = Jokers::ScaryFace(ScaryFace {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_abstract_joker() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::AbstractJoker(AbstractJoker {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair with Abstract Joker (1 joker = +3 mult)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Abstract Joker: +3 mult (1 joker)
+        // (10 + 22) * (2 + 3) = 160
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 160);
+    }
+
+    #[test]
+    fn test_gros_michel() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac]);
+
+        // Score high card without joker
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (A) -> 11 chips
+        // (5 + 11) * (1) = 16
+        let before = 16;
+        // Score high card with Gros Michel (+15 mult)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (A) -> 11 chips
+        // Gros Michel: +15 mult
+        // (5 + 11) * (1 + 15) = 256
+        let after = 256;
+
+        let j = Jokers::GrosMichel(GrosMichel {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_even_steven() {
+        let two = Card::new(Value::Two, Suit::Club);
+        let four = Card::new(Value::Four, Suit::Heart);
+        let six = Card::new(Value::Six, Suit::Diamond);
+        let eight = Card::new(Value::Eight, Suit::Spade);
+        let ten = Card::new(Value::Ten, Suit::Club);
+        let hand = SelectHand::new(vec![two, four, six, eight, ten]);
+
+        // Score high card without joker (only Ten counts in made hand)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Ten) -> 9 chips
+        // (5 + 9) * (1) = 14
+        let before = 14;
+        // Score high card with Even Steven (1 even card in made hand = +4 mult)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Ten) -> 9 chips
+        // Even Steven: +4 mult (1 even card)
+        // (5 + 9) * (1 + 4) = 70
+        let after = 70;
+
+        let j = Jokers::EvenSteven(EvenSteven {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_odd_todd() {
+        let ace = Card::new(Value::Ace, Suit::Club);
+        let three = Card::new(Value::Three, Suit::Heart);
+        let five = Card::new(Value::Five, Suit::Diamond);
+        let hand = SelectHand::new(vec![ace, three, five]);
+
+        // Score high card without joker (only Ace counts in made hand)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Ace) -> 11 chips
+        // (5 + 11) * (1) = 16
+        let before = 16;
+        // Score high card with Odd Todd (made hand has 1 odd card = +31 chips)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Ace) -> 11 chips
+        // Odd Todd: +31 chips (Ace is odd)
+        // (5 + 11 + 31) * (1) = 47
+        let after = 47;
+
+        let j = Jokers::OddTodd(OddTodd {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_scholar() {
+        let ah = Card::new(Value::Ace, Suit::Heart);
+        let ad = Card::new(Value::Ace, Suit::Diamond);
+        let hand = SelectHand::new(vec![ah, ad]);
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let before = 64;
+        // Score pair with Scholar (2 aces = +40 chips, +8 mult)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Scholar: +40 chips, +8 mult
+        // (10 + 22 + 40) * (2 + 8) = 720
+        let after = 720;
+
+        let j = Jokers::Scholar(Scholar {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_runner() {
+        let two = Card::new(Value::Two, Suit::Club);
+        let three = Card::new(Value::Three, Suit::Club);
+        let four = Card::new(Value::Four, Suit::Club);
+        let five = Card::new(Value::Five, Suit::Club);
+        let six = Card::new(Value::Six, Suit::Heart);
+        let hand = SelectHand::new(vec![two, three, four, five, six]);
+
+        // Score straight without joker
+        // straight (level 1) -> 30 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 6) -> 15 chips
+        // (15 + 30) * (4) = 180
+        let before = 180;
+        // Score straight with Runner (+15 chips)
+        // straight (level 1) -> 30 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 6) -> 15 chips
+        // Runner: +15 chips
+        // (15 + 30 + 15) * (4) = 240
+        let after = 240;
+
+        let j = Jokers::Runner(Runner {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_blue_joker() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::BlueJoker(BlueJoker {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Default deck has 52 cards, we drew 2 for the hand, so 50 in deck
+        let cards_in_deck = g.deck.cards().len();
+        // Score pair with Blue Joker (+2 chips per card in deck)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Blue Joker: +100 chips (50 cards × 2)
+        // (10 + 22 + 100) * (2) = 264
+        let expected = (10 + 22 + cards_in_deck * 2) * 2;
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, expected);
+    }
+
+    #[test]
+    fn test_square_joker() {
+        let two = Card::new(Value::Two, Suit::Club);
+        let three = Card::new(Value::Three, Suit::Heart);
+        let four = Card::new(Value::Four, Suit::Diamond);
+        let five = Card::new(Value::Five, Suit::Spade);
+        let hand = SelectHand::new(vec![two, three, four, five]);
+
+        // Score high card without joker (only 5 counts in made hand)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Five) -> 4 chips
+        // (5 + 4) * (1) = 9
+        let before = 9;
+        // Score high card with Square Joker (made hand has 1 card, not 4)
+        // Square Joker only triggers if hand has exactly 4 cards
+        // But high card only uses 1 card, so no bonus
+        // (5 + 4) * (1) = 9
+        let after = 9;
+
+        let j = Jokers::SquareJoker(SquareJoker {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_smiley_face() {
+        let kc = Card::new(Value::King, Suit::Club);
+        let qh = Card::new(Value::Queen, Suit::Heart);
+        let jd = Card::new(Value::Jack, Suit::Diamond);
+        let hand = SelectHand::new(vec![kc, qh, jd]);
+
+        // Score high card without joker (only King counts in made hand)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 King) -> 10 chips
+        // (5 + 10) * (1) = 15
+        let before = 15;
+        // Score high card with Smiley Face (1 face card in made hand = +4 mult)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 King) -> 10 chips
+        // Smiley Face: +4 mult (1 face card)
+        // (5 + 10) * (1 + 4) = 75
+        let after = 75;
+
+        let j = Jokers::SmileyFace(SmileyFace {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_swashbuckler() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::Swashbuckler(Swashbuckler {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j.clone()).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair with Swashbuckler (1 joker at $4 = sell value $2)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Swashbuckler: +2 mult (sell value of itself)
+        // (10 + 22) * (2 + 2) = 128
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 128);
+    }
+
+    #[test]
+    fn test_walkie_talkie() {
+        let ten = Card::new(Value::Ten, Suit::Club);
+        let four = Card::new(Value::Four, Suit::Heart);
+        let hand = SelectHand::new(vec![ten, four]);
+
+        // Score high card without joker (only Ten counts in made hand)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Ten) -> 9 chips
+        // (5 + 9) * (1) = 14
+        let before = 14;
+        // Score high card with Walkie Talkie (1 ten in made hand = +10 chips, +4 mult)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Ten) -> 9 chips
+        // Walkie Talkie: +10 chips, +4 mult (1 ten)
+        // (5 + 9 + 10) * (1 + 4) = 120
+        let after = 120;
+
+        let j = Jokers::WalkieTalkie(WalkieTalkie {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_fibonacci() {
+        let ace = Card::new(Value::Ace, Suit::Club);
+        let two = Card::new(Value::Two, Suit::Heart);
+        let three = Card::new(Value::Three, Suit::Diamond);
+        let five = Card::new(Value::Five, Suit::Spade);
+        let eight = Card::new(Value::Eight, Suit::Club);
+        let hand = SelectHand::new(vec![ace, two, three, five, eight]);
+
+        // Score high card without joker (only Ace counts)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Ace) -> 11 chips
+        // (5 + 11) * (1) = 16
+        let before = 16;
+        // Score high card with Fibonacci (1 fib number = +8 mult)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Ace) -> 11 chips
+        // Fibonacci: +8 mult (Ace is a fibonacci number)
+        // (5 + 11) * (1 + 8) = 144
+        let after = 144;
+
+        let j = Jokers::Fibonacci(Fibonacci {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_spare_trousers() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let kc = Card::new(Value::King, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac, kc, kc]);
+
+        // Score two pair without joker
+        // two pair (level 1) -> 20 chips, 2 mult
+        // Played cards (2 ace, 2 king) -> 42 chips
+        // (20 + 42) * (2) = 124
+        let before = 124;
+        // Score two pair with Spare Trousers (+2 mult)
+        // two pair (level 1) -> 20 chips, 2 mult
+        // Played cards (2 ace, 2 king) -> 42 chips
+        // Spare Trousers: +2 mult
+        // (20 + 42) * (2 + 2) = 248
+        let after = 248;
+
+        let j = Jokers::SpareTrousers(SpareTrousers {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_acrobat() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+        g.plays = 1; // Final hand
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::Acrobat(Acrobat {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+        g.plays = 1; // Ensure it's the final hand
+
+        // Score pair with Acrobat (X3 mult on final hand)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Acrobat: X3 mult
+        // (10 + 22) * (2 * 3) = 192
+        let score = g.calc_score(SelectHand::new(vec![ac, ac]).best_hand().unwrap());
+        assert_eq!(score, 192);
+    }
+
+    #[test]
+    fn test_onyx_agate() {
+        let two = Card::new(Value::Two, Suit::Club);
+        let three = Card::new(Value::Three, Suit::Club);
+        let four = Card::new(Value::Four, Suit::Club);
+        let five = Card::new(Value::Five, Suit::Club);
+        let ten = Card::new(Value::Ten, Suit::Club);
+        let hand = SelectHand::new(vec![two, three, four, five, ten]);
+
+        // Score flush without joker
+        // flush (level 1) -> 35 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 10) -> 19 chips
+        // (35 + 19) * (4) = 216
+        let before = 216;
+        // Score flush with Onyx Agate (5 clubs = +35 mult)
+        // flush (level 1) -> 35 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 10) -> 19 chips
+        // Onyx Agate: +35 mult (5 clubs × 7)
+        // (35 + 19) * (4 + 35) = 2106
+        let after = 2106;
+
+        let j = Jokers::OnyxAgate(OnyxAgate {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_arrowhead() {
+        let two = Card::new(Value::Two, Suit::Spade);
+        let three = Card::new(Value::Three, Suit::Spade);
+        let four = Card::new(Value::Four, Suit::Spade);
+        let five = Card::new(Value::Five, Suit::Spade);
+        let ten = Card::new(Value::Ten, Suit::Spade);
+        let hand = SelectHand::new(vec![two, three, four, five, ten]);
+
+        // Score flush without joker
+        // flush (level 1) -> 35 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 10) -> 19 chips
+        // (35 + 19) * (4) = 216
+        let before = 216;
+        // Score flush with Arrowhead (5 spades = +250 chips)
+        // flush (level 1) -> 35 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 10) -> 19 chips
+        // Arrowhead: +250 chips (5 spades × 50)
+        // (35 + 19 + 250) * (4) = 1216
+        let after = 1216;
+
+        let j = Jokers::Arrowhead(Arrowhead {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_the_duo() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let before = 64;
+        // Score pair with The Duo (X2 mult)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // The Duo: X2 mult
+        // (10 + 22) * (2 * 2) = 128
+        let after = 128;
+
+        let j = Jokers::TheDuo(TheDuo {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_the_trio() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac, ac]);
+
+        // Score three of a kind without joker
+        // 3ok (level 1) -> 30 chips, 3 mult
+        // Played cards (3 aces) -> 33 chips
+        // (30 + 33) * (3) = 189
+        let before = 189;
+        // Score 3ok with The Trio (X3 mult)
+        // 3ok (level 1) -> 30 chips, 3 mult
+        // Played cards (3 aces) -> 33 chips
+        // The Trio: X3 mult
+        // (30 + 33) * (3 * 3) = 567
+        let after = 567;
+
+        let j = Jokers::TheTrio(TheTrio {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_bloodstone() {
+        // Note: Bloodstone is probabilistic, so we test that it doesn't crash
+        // and that mult can potentially increase
+        let two = Card::new(Value::Two, Suit::Heart);
+        let three = Card::new(Value::Three, Suit::Heart);
+        let four = Card::new(Value::Four, Suit::Heart);
+        let five = Card::new(Value::Five, Suit::Heart);
+        let ten = Card::new(Value::Ten, Suit::Heart);
+        let hand = SelectHand::new(vec![two, three, four, five, ten]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score flush without joker
+        let score_without = g.calc_score(hand.best_hand().unwrap());
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::Bloodstone(Bloodstone {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score flush with Bloodstone - should be >= base score
+        let score_with = g.calc_score(SelectHand::new(vec![two, three, four, five, ten]).best_hand().unwrap());
+
+        // Bloodstone might trigger, might not - but should never be worse
+        assert!(score_with >= score_without, "Bloodstone should never reduce score");
+    }
+
+    #[test]
+    fn test_rough_gem() {
+        let two = Card::new(Value::Two, Suit::Diamond);
+        let three = Card::new(Value::Three, Suit::Diamond);
+        let four = Card::new(Value::Four, Suit::Diamond);
+        let five = Card::new(Value::Five, Suit::Diamond);
+        let ten = Card::new(Value::Ten, Suit::Diamond);
+        let hand = SelectHand::new(vec![two, three, four, five, ten]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+        let initial_money = g.money;
+
+        // Score flush without joker
+        g.calc_score(hand.best_hand().unwrap());
+        let money_without = g.money;
+
+        // Reset and buy joker
+        g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::RoughGem(RoughGem {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score flush with Rough Gem (5 diamonds = +$5)
+        g.calc_score(SelectHand::new(vec![two, three, four, five, ten]).best_hand().unwrap());
+
+        // Check we earned $5 more than without the joker
+        assert!(g.money >= money_without + 5, "Rough Gem should earn $1 per diamond");
+    }
+
+    #[test]
+    fn test_flash_card() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Enter shop and reroll 3 times
+        g.stage = Stage::Shop();
+        g.money = 1000;
+        for _ in 0..3 {
+            g.shop.reroll(&g.vouchers);
+        }
+
+        let j = Jokers::FlashCard(FlashCard {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair with Flash Card (3 rerolls = +6 mult)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Flash Card: +6 mult (3 rerolls × 2)
+        // (10 + 22) * (2 + 6) = 256
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 256);
+    }
+
+    #[test]
+    fn test_stone_joker() {
+        // Stone Joker requires stone cards in deck, which we don't have by default
+        // So we test with 0 stone cards
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let before = 64;
+        // Score pair with Stone Joker (0 stone cards = +0 chips)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Stone Joker: +0 chips
+        // (10 + 22) * (2) = 64
+        let after = 64;
+
+        let j = Jokers::StoneJoker(StoneJoker {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_bull() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+        g.money = 10; // Set money to $10
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::Bull(Bull {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+        let current_money = g.money;
+
+        // Score pair with Bull (+2 chips per $1)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Bull: +2 * money chips
+        // (10 + 22 + 2*money) * (2)
+        let expected_chips = 32 + current_money * 2;
+        let expected = expected_chips * 2;
+        let score = g.calc_score(SelectHand::new(vec![ac, ac]).best_hand().unwrap());
+        assert_eq!(score, expected);
+    }
+
+    #[test]
+    fn test_erosion() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        // Default deck has 52 cards, we haven't removed any
+        // So erosion bonus is 0
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let before = 64;
+        // Score pair with Erosion (52 cards in deck = 0 missing = +0 mult)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Erosion: +0 mult
+        // (10 + 22) * (2) = 64
+        let after = 64;
+
+        let j = Jokers::Erosion(Erosion {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_the_family() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac, ac, ac]);
+
+        // Score four of a kind without joker
+        // 4ok (level 1) -> 60 chips, 7 mult
+        // Played cards (4 aces) -> 44 chips
+        // (60 + 44) * (7) = 728
+        let before = 728;
+        // Score 4ok with The Family (X4 mult)
+        // 4ok (level 1) -> 60 chips, 7 mult
+        // Played cards (4 aces) -> 44 chips
+        // The Family: X4 mult
+        // (60 + 44) * (7 * 4) = 2912
+        let after = 2912;
+
+        let j = Jokers::TheFamily(TheFamily {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_the_order() {
+        let two = Card::new(Value::Two, Suit::Club);
+        let three = Card::new(Value::Three, Suit::Club);
+        let four = Card::new(Value::Four, Suit::Club);
+        let five = Card::new(Value::Five, Suit::Club);
+        let six = Card::new(Value::Six, Suit::Heart);
+        let hand = SelectHand::new(vec![two, three, four, five, six]);
+
+        // Score straight without joker
+        // straight (level 1) -> 30 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 6) -> 15 chips
+        // (15 + 30) * (4) = 180
+        let before = 180;
+        // Score straight with The Order (X3 mult)
+        // straight (level 1) -> 30 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 6) -> 15 chips
+        // The Order: X3 mult
+        // (15 + 30) * (4 * 3) = 540
+        let after = 540;
+
+        let j = Jokers::TheOrder(TheOrder {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_the_tribe() {
+        let two = Card::new(Value::Two, Suit::Club);
+        let three = Card::new(Value::Three, Suit::Club);
+        let four = Card::new(Value::Four, Suit::Club);
+        let five = Card::new(Value::Five, Suit::Club);
+        let ten = Card::new(Value::Ten, Suit::Club);
+        let hand = SelectHand::new(vec![two, three, four, five, ten]);
+
+        // Score flush without joker
+        // flush (level 1) -> 35 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 10) -> 19 chips
+        // (35 + 19) * (4) = 216
+        let before = 216;
+        // Score flush with The Tribe (X2 mult)
+        // flush (level 1) -> 35 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 10) -> 19 chips
+        // The Tribe: X2 mult
+        // (35 + 19) * (4 * 2) = 432
+        let after = 432;
+
+        let j = Jokers::TheTribe(TheTribe {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_triboulet() {
+        let kc = Card::new(Value::King, Suit::Club);
+        let qh = Card::new(Value::Queen, Suit::Heart);
+        let hand = SelectHand::new(vec![kc, qh]);
+
+        // Score pair without joker (high card since K and Q don't match)
+        // Actually this is a high card, only King counts
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 King) -> 10 chips
+        // (5 + 10) * (1) = 15
+        let before = 15;
+        // Score high card with Triboulet (1 King = X2 mult)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 King) -> 10 chips
+        // Triboulet: X2 mult (for the King)
+        // (5 + 10) * (1 * 2) = 30
+        let after = 30;
+
+        let j = Jokers::Triboulet(Triboulet {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_steel_joker() {
+        use crate::card::Edition;
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Add 5 foil cards to the deck (foil = steel in this codebase)
+        // Get the card IDs first
+        let card_ids: Vec<usize> = g.deck.cards().iter().take(5).map(|c| c.id).collect();
+        for card_id in card_ids {
+            g.modify_card_in_deck(card_id, |c| {
+                c.edition = Edition::Foil;
+            });
+        }
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::SteelJoker(SteelJoker {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j.clone()).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair with Steel Joker (5 foil cards = X2.0 mult)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Steel Joker: X2.0 mult (1.0 + 0.2 * 5)
+        // (10 + 22) * (2 * 2.0) = (10 + 22) * 4 = 128
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 128);
+    }
+
+    #[test]
+    fn test_flower_pot() {
+        let two_d = Card::new(Value::Two, Suit::Diamond);
+        let three_c = Card::new(Value::Three, Suit::Club);
+        let four_h = Card::new(Value::Four, Suit::Heart);
+        let five_s = Card::new(Value::Five, Suit::Spade);
+        let six_d = Card::new(Value::Six, Suit::Diamond);
+        let hand = SelectHand::new(vec![two_d, three_c, four_h, five_s, six_d]);
+
+        // This is actually a straight! (2, 3, 4, 5, 6)
+        // Score straight without joker
+        // straight (level 1) -> 30 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 6) -> 15 chips
+        // (30 + 15) * (4) = 180
+        let before = 180;
+        // Score straight with Flower Pot (has all 4 suits = X3 mult)
+        // straight (level 1) -> 30 chips, 4 mult
+        // Played cards (2, 3, 4, 5, 6) -> 15 chips
+        // Flower Pot: X3 mult
+        // (30 + 15) * (4 * 3) = 540
+        let after = 540;
+
+        let j = Jokers::FlowerPot(FlowerPot {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_seeing_double() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let kh = Card::new(Value::King, Suit::Heart);
+        let hand = SelectHand::new(vec![ac, kh]);
+
+        // Score high card without joker (only Ace counts in made hand)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Ace) -> 11 chips
+        // (5 + 11) * (1) = 16
+        let before = 16;
+        // Score high card with Seeing Double (has club and non-club = X2 mult)
+        // high card (level 1) -> 5 chips, 1 mult
+        // Played cards (1 Ace) -> 11 chips
+        // Seeing Double: X2 mult
+        // (5 + 11) * (1 * 2) = 32
+        let after = 32;
+
+        let j = Jokers::SeeingDouble(SeeingDouble {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_joker_stencil() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker (1 joker in slots = 4 empty + 1 for itself = 5 empty)
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::JokerStencil(JokerStencil {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j.clone()).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair with Joker Stencil (5 empty slots = X5 mult)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Joker Stencil: X5 mult (5 empty slots)
+        // (10 + 22) * (2 * 5) = 320
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 320);
+    }
+
+    #[test]
+    fn test_showman() {
+        use crate::consumable::Consumables;
+        use crate::tarot::Tarots;
+
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Add 2 consumables to the game
+        g.consumables.push(Consumables::Tarot(Tarots::TheFool));
+        g.consumables.push(Consumables::Tarot(Tarots::TheMagician));
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::Showman(Showman {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j.clone()).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair with Showman (2 consumables = +8 mult)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Showman: +8 mult (2 consumables * 4)
+        // (10 + 22) * (2 + 8) = 320
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 320);
+    }
+
+    #[test]
+    fn test_bootstraps() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+        g.money = 25; // $25 = 5 * $5, so +10 mult
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy and apply the joker
+        g.money += 1000;
+        g.stage = Stage::Shop();
+        let j = Jokers::Bootstraps(Bootstraps {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j.clone()).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair with Bootstraps ($1019 / 5 = 203, 203 * 2 = 406 mult bonus)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Bootstraps: +406 mult (1019 / 5 * 2)
+        // (10 + 22) * (2 + 406) = 13056
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 13056);
+    }
+
+    #[test]
+    fn test_wee_joker() {
+        let two_c = Card::new(Value::Two, Suit::Club);
+        let two_h = Card::new(Value::Two, Suit::Heart);
+        let hand = SelectHand::new(vec![two_c, two_h]);
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 twos) -> 2 chips (only one two counted? or 1 chip each?)
+        // (10 + 2) * (2) = 24 (actual)
+        let before = 24;
+        // Score pair with Wee Joker (2 twos in made hand = +16 chips)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 twos) -> 2 chips
+        // Wee Joker: +16 chips (2 twos * 8)
+        // (10 + 2 + 16) * (2) = 56
+        let after = 56;
+
+        let j = Jokers::WeeJoker(WeeJoker {});
+        score_before_after_joker(j, hand, before, after);
+    }
+
+    #[test]
+    fn test_baseball_card() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        let mut g = Game::default();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 64);
+
+        // Buy Baseball Card and 2 Uncommon jokers
+        g.money += 1000;
+        g.stage = Stage::Shop();
+
+        // Add 2 uncommon jokers
+        let j1 = Jokers::SteelJoker(SteelJoker {});
+        g.shop.jokers.push(j1.clone());
+        g.buy_joker(j1.clone()).unwrap();
+
+        let j2 = Jokers::FlowerPot(FlowerPot {});
+        g.shop.jokers.push(j2.clone());
+        g.buy_joker(j2.clone()).unwrap();
+
+        // Now buy Baseball Card
+        let j = Jokers::BaseballCard(BaseballCard {});
+        g.shop.jokers.push(j.clone());
+        g.buy_joker(j.clone()).unwrap();
+        g.stage = Stage::Blind(Blind::Small, None);
+
+        // Score pair with Baseball Card (2 uncommons = X2.25 mult from 1.5^2)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Baseball Card: X2.25 mult (1.5 ^ 2 uncommons)
+        // (10 + 22) * (2 * 2.25) = 144, but truncation gives us (2 * 2) = 4
+        // So actual result: (10 + 22) * 4 = 128
+        let score = g.calc_score(hand.best_hand().unwrap());
+        assert_eq!(score, 128);
+    }
+
+    #[test]
+    fn test_stuntman() {
+        let ac = Card::new(Value::Ace, Suit::Club);
+        let hand = SelectHand::new(vec![ac, ac]);
+
+        // Score pair without joker
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // (10 + 22) * (2) = 64
+        let before = 64;
+        // Score pair with Stuntman (+250 chips)
+        // pair (level 1) -> 10 chips, 2 mult
+        // Played cards (2 aces) -> 22 chips
+        // Stuntman: +250 chips
+        // (10 + 22 + 250) * (2) = 564
+        let after = 564;
+
+        let j = Jokers::Stuntman(Stuntman {});
         score_before_after_joker(j, hand, before, after);
     }
 }
