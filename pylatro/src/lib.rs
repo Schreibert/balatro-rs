@@ -131,5 +131,6 @@ fn pylatro(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<GameEngine>()?;
     m.add_class::<GameState>()?;
     m.add_class::<Stage>()?;
+    m.add_class::<Action>()?;
     Ok(())
 }
