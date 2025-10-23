@@ -2,6 +2,8 @@
 use pyo3::{pyclass, pymethods};
 use std::fmt;
 
+use crate::boss_modifier::BossModifier;
+
 /// Types of blinds
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "python", pyclass(eq))]
@@ -59,8 +61,8 @@ pub enum End {
 pub enum Stage {
     // See blind conditions, choose blind (or skip blind)
     PreBlind(),
-    // Play blind
-    Blind(Blind),
+    // Play blind (with optional boss modifier for Boss blinds)
+    Blind(Blind, Option<BossModifier>),
     // Collect payout, optionally play consumables
     PostBlind(),
     // Buy jokers, consumables
@@ -72,9 +74,25 @@ pub enum Stage {
 impl Stage {
     pub(crate) fn is_blind(&self) -> bool {
         return match self {
-            Stage::Blind(_) => true,
+            Stage::Blind(_, _) => true,
             _ => false,
         };
+    }
+
+    /// Get the blind if this is a Blind stage
+    pub fn blind(&self) -> Option<Blind> {
+        match self {
+            Stage::Blind(blind, _) => Some(*blind),
+            _ => None,
+        }
+    }
+
+    /// Get the boss modifier if this is a Boss Blind stage
+    pub fn boss_modifier(&self) -> Option<BossModifier> {
+        match self {
+            Stage::Blind(Blind::Boss, modifier) => *modifier,
+            _ => None,
+        }
     }
 }
 
@@ -84,7 +102,7 @@ impl Stage {
     fn int(&self) -> usize {
         match self {
             Self::PreBlind() => 0,
-            Self::Blind(blind) => match blind {
+            Self::Blind(blind, _) => match blind {
                 Blind::Small => 1,
                 Blind::Big => 2,
                 Blind::Boss => 3,
