@@ -1,12 +1,17 @@
 
 # Feature Implementation Status — Detailed Spec & Effects
 
+**Last Updated:** 2025-10-17
+**Status:** This document may contain outdated status markers. For current implementation status, see [PROJECT_STATUS.md](../../PROJECT_STATUS.md)
+
 This document details **Tarots, Planets, Spectrals, Vouchers, Booster Packs, etc.**, with known effects, acquisition mechanics, and gameplay impact.
 
 **Legend:**
 - ✅ = Fully Implemented
 - ⚠️ = Partially Implemented
 - ❌ = Not Implemented
+
+**Note:** Individual status markers below may not reflect current implementation state. This document serves primarily as a feature specification reference.
 
 ---
 
