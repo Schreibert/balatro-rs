@@ -65,7 +65,7 @@ The following features are missing and may or may not be added:
 - [ ] plasma deck special scoring
 - [ ] some complex joker mechanics (retriggers, effect copying)
 
-See [PROJECT_STATUS.md](PROJECT_STATUS.md) for detailed feature breakdown and [docs/reference/MISSING_FEATURES_DETAILED.md](docs/reference/MISSING_FEATURES_DETAILED.md) for comprehensive missing feature list.
+See [PROJECT_STATUS.md](PROJECT_STATUS.md) for detailed feature breakdown
 
 
 ## Python bindings
@@ -75,11 +75,4 @@ This library uses [pyo3](https://pyo3.rs) to provide python bindings. For more d
 ## Documentation
 
 - **[PROJECT_STATUS.md](PROJECT_STATUS.md)** - Comprehensive project status and feature completion
-- **[CLAUDE.md](CLAUDE.md)** - AI assistant instructions for working with this codebase
-- **[docs/](docs/)** - All additional documentation organized by category:
-  - **[docs/reference/](docs/reference/)** - Game rules and feature references
-  - **[docs/history/](docs/history/)** - Phase completion documents
-  - **[docs/sessions/](docs/sessions/)** - Development session summaries
-  - **[docs/design/](docs/design/)** - Implementation plans and design documents
-
-See [docs/INDEX.md](docs/INDEX.md) for a complete guide to the documentation structure.
+- **[docs/](docs/)** - - Game rules and feature references

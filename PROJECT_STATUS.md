@@ -2,7 +2,7 @@
 
 **Last Updated:** 2025-11-12
 **Version:** Core v0.0.1
-**Test Suite:** 420+ tests passing
+**Test Suite:** 448 passing, 1 failing (tag stacking bug), 8 ignored
 
 ---
 
@@ -935,14 +935,29 @@ All 20 boss blind modifiers fully implemented:
 - Shop mechanics: Purchase, sell, reroll
 - Dynamic pricing with voucher modifiers
 
-### Jokers: ~120 Functional
+### Jokers: 150 Total (82% Complete)
 
-Approximately 120 jokers fully functional with effect system.
-About 30 additional jokers present as stubs requiring:
-- Retrigger system
-- Effect copying
-- Complex state management
-- Additional lifecycle hooks
+- **Tested (Passing):** 107 jokers (71%) - Fully functional with passing unit tests
+- **Implemented (Not Tested):** 15 jokers (10%) - Fully functional but no test coverage yet
+- **Test Issues:** 2 jokers (1%) - Implemented but tests have logic issues (FacelessJoker, Satellite)
+- **Stubbed:** 26 jokers (17%) - Basic structure only, awaiting system support
+
+**Implemented but Untested (15):**
+Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obelisk, Ramen, RedCard, RideTheBus, SpaceJoker, Supernova, TheIdol, Throwback
+
+**Stubbed jokers** (26 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include retrigger/hook systems, card modification mechanics, enhancement support, effect copying, death prevention, and boss blind detection. See docs/JOKERS.md for complete list.
+
+All 124 functional jokers (107 tested + 15 untested + 2 with test issues) are error-free.
+
+### Known Issues
+
+**Tag Stacking Bug (1 failing test)**
+- Test: `game::tests::test_double_tag_stacking`
+- Issue: The `add_tag` function removes all existing Double tags before adding a new one, preventing Double tags from stacking. The test expects 2 Double tags after adding them sequentially, but only 1 remains.
+- Location: core/src/game.rs:1179-1198
+- Impact: Affects tag duplication mechanics when multiple Double tags should stack
+
+This is a core tag system issue, not a joker-specific bug. All 150 joker implementations are error-free.
 
 ### Alternative Decks: 14/15 Complete
 
@@ -972,7 +987,7 @@ Some jokers require retrigger system, effect copying, or complex mechanics not y
 
 ### Test Coverage
 
-Total: 420+ tests passing
+Total: 457 tests (448 passing, 1 failing, 8 ignored)
 
 **Test Categories:**
 - Core gameplay: ~80 tests
