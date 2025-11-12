@@ -62,3 +62,15 @@ The following features are missing and may or may not be added
 ## Python bindings
 
 This library uses [pyo3](https://pyo3.rs) to provide python bindings. For more details on the python work and attempts at applying reinforcement learning, check the work in the directory [/pylatro](https://github.com/evanofslack/balatro-rs/tree/main/pylatro).
+
+## Documentation
+
+- **[PROJECT_STATUS.md](PROJECT_STATUS.md)** - Comprehensive project status and feature completion
+- **[CLAUDE.md](CLAUDE.md)** - AI assistant instructions for working with this codebase
+- **[docs/](docs/)** - All additional documentation organized by category:
+  - **[docs/reference/](docs/reference/)** - Game rules and feature references
+  - **[docs/history/](docs/history/)** - Phase completion documents
+  - **[docs/sessions/](docs/sessions/)** - Development session summaries
+  - **[docs/design/](docs/design/)** - Implementation plans and design documents
+
+See [docs/INDEX.md](docs/INDEX.md) for a complete guide to the documentation structure.

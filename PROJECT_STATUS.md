@@ -591,7 +591,9 @@ Total Tests: 330 (all passing ✅)
 **Documentation (20+ files):**
 - README.md, CLAUDE.md, PROJECT_STATUS.md
 - docs/history/ (15 phase completion documents)
-- BALATRO_BASIC_RULES.md, MISSING_FEATURES_DETAILED.md
+- docs/sessions/ (5 development session summaries)
+- docs/design/ (2 implementation/design documents)
+- docs/reference/ (3 game reference documents)
 
 ---
 
@@ -933,8 +935,9 @@ cargo run -p cli
 - `README.md` - Project overview and examples
 - `PROJECT_STATUS.md` - This document (comprehensive status)
 - `CLAUDE.md` - AI assistant instructions
-- `BALATRO_BASIC_RULES.md` - Game rules reference
-- `MISSING_FEATURES_DETAILED.md` - Detailed missing feature list
+- `docs/reference/BALATRO_BASIC_RULES.md` - Game rules reference
+- `docs/reference/MISSING_FEATURES_DETAILED.md` - Detailed missing feature list
+- `docs/reference/JOKERS.md` - Complete joker reference
 
 **Phase Completion Documents (docs/history/):**
 - `PHASE_1_COMPLETION.md` - Card enhancement system
@@ -1054,8 +1057,11 @@ cargo run -p cli
 
 ### Related Documents
 - See `docs/history/` for detailed phase completion reports
+- See `docs/sessions/` for development session summaries
+- See `docs/design/` for implementation plans and design documents
+- See `docs/reference/` for game rules and feature references
 - See `CLAUDE.md` for AI assistant guidelines
-- See `MISSING_FEATURES_DETAILED.md` for feature details
+- See `docs/reference/MISSING_FEATURES_DETAILED.md` for feature details
 
 ---
 
