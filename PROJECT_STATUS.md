@@ -1,701 +1,1039 @@
-# balatro-rs: Project Status & Progress
+# balatro-rs: Project Documentation
 
-**Last Updated:** 2025-10-17
+**Last Updated:** 2025-11-12
 **Version:** Core v0.0.1
-**Test Suite:** 330 tests passing ✅
-**New:** Skip Blind & Tag System (100% complete)
+**Test Suite:** 420+ tests passing
 
 ---
 
-## Quick Overview
+## Table of Contents
 
-balatro-rs is a Rust implementation of Balatro (poker roguelike game) with Python bindings, designed for reinforcement learning applications. The project provides an exhaustive move generator and game engine for applying RL techniques to Balatro.
-
-**Current Status:** **Core gameplay functional with advanced features**
+1. [Project Overview](#project-overview)
+2. [Architecture](#architecture)
+3. [Core Game Systems](#core-game-systems)
+4. [Advanced Features](#advanced-features)
+5. [Action Generation](#action-generation)
+6. [Implementation Status](#implementation-status)
+7. [Development Information](#development-information)
 
 ---
 
-## Project Structure
+## Project Overview
+
+balatro-rs is a Rust implementation of Balatro, a poker roguelike deckbuilder game. The project provides a complete game engine with move generation capabilities specifically designed for reinforcement learning applications. The implementation achieves approximately 82% feature parity with the full game.
+
+### Project Structure
 
 ```
 balatro-rs/
-├── core/              # Main game engine (balatro-rs crate)
-│   ├── src/           # Game logic, move generation, scoring
-│   └── tests/         # 233 comprehensive tests
-├── pylatro/           # Python bindings (PyO3)
-│   ├── examples/      # Python simulation examples
-│   └── gym/           # OpenAI Gym environment wrapper
-├── cli/               # Command-line interface
-├── docs/
-│   └── history/       # Phase completion documents
-├── CLAUDE.md          # AI assistant instructions
-├── PROJECT_STATUS.md  # This document
-└── README.md          # Project README
+├── core/              Main game engine (balatro-rs crate)
+│   ├── src/          Game logic, move generation, scoring
+│   └── tests/        420+ comprehensive tests
+├── pylatro/          Python bindings via PyO3
+│   ├── examples/     Python simulation examples
+│   └── gym/          OpenAI Gym environment wrapper
+├── cli/              Command-line interface
+└── docs/             Documentation
+    ├── history/      Phase completion documents
+    ├── sessions/     Development session summaries
+    ├── design/       Implementation plans
+    └── reference/    Game rules and feature references
 ```
 
----
+### Key Capabilities
 
-## Feature Implementation Status
-
-### ✅ Core Gameplay (100%)
-
-| Feature | Status | Tests | Notes |
-|---------|--------|-------|-------|
-| **Poker Hand Detection** | ✅ Complete | 20+ | All 13 hand ranks including Flush Five, Flush House |
-| **Card Management** | ✅ Complete | 15+ | Play, discard, reorder, draw, deal |
-| **Scoring System** | ✅ Complete | 25+ | Dynamic with enhancements, editions, seals |
-| **Money/Interest** | ✅ Complete | 8+ | Earn, spend, interest calculation |
-| **Ante Progression** | ✅ Complete | 5+ | Up to Ante 8 (Balatro max) |
-| **Blind System** | ✅ Complete | 12+ | Small, Big, Boss blind progression |
-| **Stage Transitions** | ✅ Complete | 10+ | PreBlind → Blind → PostBlind → Shop |
-| **Win/Loss Conditions** | ✅ Complete | 5+ | Proper game end detection |
-
-**Lines of Code:** ~3,500
-**Test Coverage:** 80+ tests
+- **Exhaustive Move Generation**: Provides all legal actions at any game state
+- **Fixed-Size Action Space**: 79-dimensional action space for RL agents
+- **Fast Simulation**: Capable of 1000+ games per second
+- **Python Bindings**: Full PyO3 integration for Python/RL frameworks
+- **Comprehensive Testing**: Over 420 tests covering all major systems
 
 ---
 
-### ✅ Card Modifiers (95%)
+## Architecture
 
-#### Enhancements (6/8 Complete)
-| Enhancement | Effect | Status | Implementation |
-|-------------|--------|--------|----------------|
-| **Bonus** | +30 chips | ✅ Complete | Phase 1 |
-| **Mult** | +4 mult | ✅ Complete | Phase 1 |
-| **Stone** | +50 chips, no rank | ✅ Complete | Phase 1 |
-| **Glass** | ×2 mult, 1/4 destroy | ✅ Complete | Phase 1 |
-| **Steel** | ×1.5 mult | ✅ Complete | Phase 1 |
-| **Gold** | +$3 on play | ✅ Complete | Phase 1 |
-| **Wild** | Acts as any suit | ⏸️ Deferred | Phase 1.1 |
-| **Lucky** | Probability bonuses | ⏸️ Deferred | Phase 1.1 |
+### Game State Machine
 
-#### Editions (4/4 Complete)
-| Edition | Effect | Status |
-|---------|--------|--------|
-| **Foil** | +50 chips | ✅ Complete |
-| **Holographic** | +10 mult | ✅ Complete |
-| **Polychrome** | ×1.5 mult | ✅ Complete |
-| **Negative** | +1 joker slot | ✅ Complete |
+The game progresses through a series of stages defined in `core/src/stage.rs`:
 
-#### Seals (4/4 Complete)
-| Seal | Effect | Status |
-|------|--------|--------|
-| **Red** | Retrigger (×2 scoring) | ✅ Complete |
-| **Gold** | +$3 when played | ✅ Complete |
-| **Blue** | Create Planet on play | ✅ Complete |
-| **Purple** | Create Tarot on discard | ✅ Complete |
+**Stage Flow:**
+```
+PreBlind → Blind → PostBlind → Shop → [repeat for next blind]
+```
 
-**Phase:** 1 (Complete)
-**Lines Added:** ~280
-**Tests:** 11 new tests
+#### Stage Definitions
+
+**PreBlind**
+The preparation stage before each blind. Players can:
+- View blind conditions and boss modifiers
+- Choose to play the current blind (Small, Big, or Boss)
+- Or skip blind for a tag reward (Small and Big only)
+
+**Blind(Blind, Option<BossModifier>)**
+The active gameplay stage where players:
+- Play poker hands to accumulate score
+- Must reach the target score within limited hands/discards
+- Face optional boss modifiers on Boss blinds that add constraints
+
+**PostBlind**
+The reward collection stage after clearing a blind where players:
+- Collect money rewards (Small: $3, Big: $4, Boss: $5)
+- Optionally use consumable cards
+- Receive interest on held money
+
+**Shop**
+The purchasing stage where players can:
+- Buy jokers (permanent modifiers)
+- Buy consumables (one-time use cards)
+- Buy booster packs
+- Buy vouchers (permanent upgrades)
+- Sell jokers
+- Reroll shop contents (costs money)
+
+**End(End)**
+Terminal stage indicating game over:
+- Win: Successfully cleared Ante 8
+- Lose: Failed to reach score requirement
+
+### Core Data Structures
+
+#### Game (core/src/game.rs)
+
+The central game state containing:
+- **Deck**: All cards in the deck
+- **Hand**: Cards currently drawable/in hand
+- **Available**: Cards that can be selected for play/discard
+- **Stage**: Current game stage
+- **Ante**: Current difficulty level (1-8)
+- **Score**: Current score and target requirements
+- **Money**: Current funds and interest tracking
+- **Hands/Discards**: Remaining actions per blind
+- **Jokers**: Active joker modifiers
+- **Consumables**: Available consumable cards
+- **Shop**: Shop state and inventory
+- **Effect Registry**: Registered joker effects
+- **Boss Modifier**: Active boss blind modifier
+- **Modifiers**: Game rule modifiers from jokers
+- **Tags**: Queue of pending tag rewards
+
+#### Card (core/src/card.rs)
+
+Cards are the fundamental unit with properties:
+- **Value**: Rank (2-Ace)
+- **Suit**: Suit (Spades, Hearts, Clubs, Diamonds)
+- **Enhancement**: Optional modifier (Bonus, Mult, Stone, Glass, Steel, Gold)
+- **Edition**: Visual effect with bonus (Base, Foil, Holographic, Polychrome, Negative)
+- **Seal**: Special effect trigger (Gold, Red, Blue, Purple)
+- **Face Down**: Boolean for boss modifier effects
+
+#### Action (core/src/action.rs)
+
+Actions represent all possible player moves:
+- `SelectCard(Card)`: Select a card for play/discard
+- `MoveCard(Direction, Card)`: Reorder cards in hand
+- `Play()`: Play selected cards as a poker hand
+- `Discard()`: Discard selected cards
+- `CashOut(usize)`: Collect reward and proceed
+- `BuyJoker(Jokers)`: Purchase a joker
+- `BuyConsumable(Consumables)`: Purchase a consumable
+- `UseConsumable(Consumables, Option<Vec<Card>>)`: Use a consumable with optional card targets
+- `NextRound()`: Proceed to next stage
+- `SelectBlind(Blind)`: Choose which blind to play
+- `SkipBlind()`: Skip blind for tag reward
+- `SelectFromTagPack(usize)`: Select reward from tag pack
+- `SellJoker(Jokers)`: Sell a joker in shop
 
 ---
 
-### ✅ Consumables System (90%)
+## Core Game Systems
 
-#### Infrastructure (100%)
-- ✅ Consumable trait with use_effect()
-- ✅ Targeting system (1-3 cards)
-- ✅ Inventory management
-- ✅ Cost and purchase mechanics
-- ✅ Last used tracking (for The Fool)
+### Poker Hand Detection
+
+Location: `core/src/hand.rs`
+
+The hand detection system identifies the best poker hand from selected cards. Balatro includes 13 hand ranks, including special hands not found in traditional poker.
+
+#### Hand Ranks (Highest to Lowest)
+
+1. **Flush Five**: 5 cards of same rank and suit (e.g., 5 Queens of Hearts)
+2. **Flush House**: Full House where all cards share same suit
+3. **Five of a Kind**: 5 cards of same rank
+4. **Royal Flush**: Straight Flush with 10-J-Q-K-A
+5. **Straight Flush**: 5 cards in sequence, all same suit
+6. **Four of a Kind**: 4 cards of same rank
+7. **Full House**: 3 of a kind + 2 of a kind
+8. **Flush**: 5 cards of same suit
+9. **Straight**: 5 cards in sequence
+10. **Three of a Kind**: 3 cards of same rank
+11. **Two Pair**: 2 pairs of same rank
+12. **Pair**: 2 cards of same rank
+13. **High Card**: No matching cards
+
+#### Hand Context System
+
+The `HandContext` struct allows game modifiers to affect hand detection:
+
+```rust
+pub struct HandContext<'a> {
+    pub modifiers: &'a GameModifiers,
+}
+```
+
+**Game Modifiers:**
+- `four_card_straights`: Straights with only 4 cards count
+- `four_card_flushes`: Flushes with only 4 cards count
+- `all_cards_are_faces`: All cards treated as face cards
+- `smeared_suits`: Hearts/Diamonds same, Spades/Clubs same
+- `gap_straights`: Straights with 1-rank gaps allowed
+- `all_cards_score`: All selected cards score (not just hand)
+
+#### Implementation Details
+
+The `SelectHand` type represents up to 5 selected cards and provides methods for hand detection:
+- `best_hand_with_context()`: Detects best hand with modifier support
+- `values_freq()`: Maps card ranks to cards for pair detection
+- `suits_freq()`: Maps suits to cards for flush detection
+- Face-down cards (from boss modifiers) are filtered out before detection
+
+### Scoring System
+
+Location: `core/src/game.rs` (calc_score method)
+
+Scoring combines poker hand levels with card-specific bonuses and multipliers.
+
+#### Scoring Formula
+
+```
+Final Score = (Base Chips + Card Chips) × (Base Mult + Card Mult) × Edition Multipliers
+```
+
+#### Scoring Process
+
+1. **Base Score from Hand Level**
+   Each poker hand type has a level that increases when upgraded by planet cards.
+   - Base Chips: e.g., Pair Level 1 = 10 chips
+   - Base Mult: e.g., Pair Level 1 = 2 mult
+
+2. **Card Chips**
+   Each card in the hand contributes chips based on rank:
+   - Number cards (2-10): Face value in chips
+   - Face cards (J/Q/K): 10 chips each
+   - Aces: 11 chips each
+   - Enhancements add bonus chips (Bonus: +30, Stone: +50)
+
+3. **Card Mult**
+   Enhancements can add to mult (Mult enhancement: +4)
+
+4. **Edition Multipliers**
+   Card editions apply multiplicative bonuses:
+   - Foil: +50 chips
+   - Holographic: +10 mult
+   - Polychrome: ×1.5 mult multiplier
+   - Negative: +1 joker slot (no scoring bonus)
+
+5. **Joker Effects**
+   After base scoring, registered joker effects fire via the effect registry, potentially modifying chips, mult, or multipliers.
+
+6. **Final Calculation**
+   `score = chips × mult × multipliers`
+
+#### Hand Leveling
+
+Planet cards upgrade poker hands permanently:
+- Chips increase by formula: +30/+25/+20 (first 3 levels), then +20
+- Mult increases by formula: +3/+2/+2 (first 3 levels), then +2
+- Levels persist across rounds and antes
+
+### Blind System
+
+Location: `core/src/stage.rs`, `core/src/boss_modifier.rs`
+
+Blinds are challenges that must be overcome by reaching a score threshold.
+
+#### Blind Types
+
+**Small Blind**
+- Lowest score requirement
+- Reward: $3
+- Can be skipped for a tag
+
+**Big Blind**
+- Medium score requirement
+- Reward: $4
+- Can be skipped for a tag
+
+**Boss Blind**
+- Highest score requirement (×2.0 previous blind score, or ×2.5 for The Wall)
+- Reward: $5
+- Includes a random boss modifier
+- Cannot be skipped
+
+#### Score Requirements
+
+Each ante multiplies the base score requirement:
+- Ante 1: Base = 300
+- Ante 2: Base × 1.5
+- Ante 3: Base × 2.0
+- Each subsequent ante increases further
+
+Within each ante:
+- Small: 1.0× ante requirement
+- Big: 1.5× ante requirement
+- Boss: 2.0× (or 2.5× for The Wall modifier)
+
+### Boss Modifier System
+
+Location: `core/src/boss_modifier.rs`
+
+Boss modifiers add constraints and challenges to boss blinds. All 20 modifiers are fully implemented.
+
+#### Category A: Simple Constraints
+
+**The Wall**
+Score requirement is ×2.5 instead of ×2.0, making the blind significantly harder.
+
+**The Manacle**
+Hand size is reduced by 1 for the entire blind, limiting card selection.
+
+**The Water**
+Player starts with 0 discards for this blind, no discarding allowed.
+
+**The Needle**
+Player can only play 1 hand total for this blind, must make it count.
+
+**The Arm**
+After each hand played, that poker hand type's level decreases by 1.
+
+**The Tooth**
+Player loses $1 for each card played during the blind.
+
+#### Category B: Card Debuffing
+
+**The Club / The Goad / The Window / The Head**
+All cards of a specific suit (Clubs/Spades/Diamonds/Hearts respectively) are debuffed and don't contribute to scoring.
+
+**The Plant**
+All face cards (Jack, Queen, King) are debuffed.
+
+**The Flint**
+All chip and mult values are halved after calculation.
+
+#### Category C: Hand Restrictions
+
+**The Eye**
+No poker hand type can be played more than once. Forces hand diversity.
+
+**The Mouth**
+Only one specific poker hand type can be played throughout the blind.
+
+**The Serpent**
+The first hand played always scores 0, regardless of cards.
+
+**The Hook**
+After each hand played, 2 random cards are discarded from the player's hand.
+
+#### Category D: Complex Mechanics
+
+**The Ox**
+The leftmost card in hand is always face-down (no visible rank/suit).
+
+**The House**
+First hand of the blind is dealt with only 1 card instead of the full hand size.
+
+**The Wheel**
+Each card has a 1/7 chance to be dealt face-down randomly.
+
+**The Pillar**
+When playing cards, they are selected randomly instead of by player choice.
+
+---
+
+## Advanced Features
+
+### Card Modifier System
+
+Location: `core/src/card.rs`
+
+Cards can have three types of modifiers that enhance their properties.
+
+#### Enhancements
+
+Enhancements modify a card's core properties. Implemented: 6/8
+
+**Bonus** (+30 chips)
+Card contributes +30 bonus chips when scored.
+
+**Mult** (+4 mult)
+Card contributes +4 to mult when scored.
+
+**Stone** (+50 chips, no rank)
+Card gives +50 chips but has no rank (doesn't count for pairs/straights).
+
+**Glass** (×2 mult, 1/4 destroy chance)
+Card doubles mult when scored, but has 25% chance to be destroyed after scoring.
+
+**Steel** (×1.5 mult)
+Card applies ×1.5 multiplier to mult when scored.
+
+**Gold** (+$3 when played)
+Card grants $3 when played or held in hand (boss blind).
+
+**Wild** (not implemented)
+Card acts as any suit for flush detection.
+
+**Lucky** (not implemented)
+Card provides probabilistic chip/mult bonuses.
+
+#### Editions
+
+Editions are visual effects that provide bonuses. Implemented: 4/4
+
+**Foil** (+50 chips)
+Adds +50 chips to card when scored.
+
+**Holographic** (+10 mult)
+Adds +10 mult when scored.
+
+**Polychrome** (×1.5 mult)
+Multiplies final score by 1.5.
+
+**Negative** (+1 joker slot)
+Adds an additional joker slot (no direct scoring bonus).
+
+#### Seals
+
+Seals trigger special effects when cards are played/discarded. Implemented: 4/4
+
+**Red Seal**
+Retriggers the card (scores it twice).
+
+**Gold Seal**
+Grants $3 when the card is played.
+
+**Blue Seal**
+Creates a random Planet card for the played hand when played.
+
+**Purple Seal**
+Creates a random Tarot card when discarded.
+
+### Consumable System
+
+Location: `core/src/consumable.rs`, `core/src/tarot.rs`, `core/src/planet.rs`, `core/src/spectral.rs`
+
+Consumables are one-time use cards that modify the game state.
+
+#### Consumable Trait
+
+All consumables implement a common interface:
+- `name()`: Display name
+- `desc()`: Effect description
+- `cost()`: Purchase price
+- `requires_target()`: Whether card targets are needed
+- `max_targets()`: Maximum cards that can be targeted
+- `use_effect()`: Execute the consumable's effect
+- `consumable_type()`: Tarot, Planet, or Spectral
 
 #### Tarot Cards (22/22 Complete)
-All 22 Major Arcana tarot cards fully implemented with card modification effects:
-- ✅ Enhancement conversion (Magician, Empress, Hierophant, etc.)
-- ✅ Suit conversion (Star, Moon, Sun, World)
-- ✅ Rank modification (Strength, Hanged Man, Death)
-- ✅ Generation effects (Emperor, High Priestess, Judgement)
-- ✅ Special effects (Fool, Hermit, Temperance, Wheel of Fortune)
 
-**Phase:** 3A (Complete)
-**Lines Added:** ~850
-**Tests:** 32 new tests
+Tarot cards modify individual cards in the deck. Major categories:
+
+**Enhancement Conversion**
+- The Magician: Converts up to 2 cards to Lucky enhancement
+- The High Priestess: Creates 2 random Planet cards
+- The Empress: Converts up to 2 cards to Mult enhancement
+- The Hierophant: Converts up to 2 cards to Bonus enhancement
+- The Chariot: Converts 1 card to Steel enhancement
+- The Devil: Converts 1 card to Gold enhancement
+- The Tower: Converts 1 card to Stone enhancement
+- The Lovers: Converts 1 card to Wild enhancement
+
+**Suit Conversion**
+- The Star: Converts up to 3 cards to Diamonds
+- The Moon: Converts up to 3 cards to Clubs
+- The Sun: Converts up to 3 cards to Hearts
+- The World: Converts up to 3 cards to Spades
+
+**Rank Modification**
+- Strength: Increases rank of up to 2 cards by 1
+- The Hanged Man: Destroys up to 2 selected cards
+- Death: Converts 2 selected cards to 1 random card with same rank
+- Temperance: Gives total sell value of all jokers (max $50)
+
+**Card Generation**
+- The Emperor: Creates 2-5 random Tarot cards
+- Judgement: Creates a random Joker card
+- The Hermit: Doubles money (max $20)
+- The Wheel of Fortune: 1/4 chance to add Foil, Holographic, or Polychrome edition to 1 card
+
+**Special Effects**
+- The Fool: Repeats the last consumable used
+- Justice: Creates a random Tarot card
+- Temperance: Provides money based on joker values
 
 #### Planet Cards (12/12 Complete)
-All 12 planets upgrade their corresponding poker hands:
-- ✅ Standard planets: Pluto, Mercury, Venus, Earth, Mars, Saturn, Neptune
-- ✅ Secret planets: Ceres, Eris, Planet X, Jupiter, Uranus
-- ✅ Hand leveling system with Balatro upgrade formula (30/3, 25/2, 20/2)
-- ✅ Dynamic scoring integration
 
-**Phase:** 3B (Complete)
-**Lines Added:** ~230
-**Tests:** 14 new tests
+Planet cards upgrade the level of their corresponding poker hand.
+
+**Standard Planets**
+- Pluto: High Card
+- Mercury: Pair
+- Venus: Two Pair
+- Earth: Three of a Kind
+- Mars: Straight
+- Saturn: Flush
+- Neptune: Full House
+
+**Secret Planets**
+- Ceres: Four of a Kind
+- Eris: Straight Flush
+- Planet X: Royal Flush
+- Jupiter: Five of a Kind
+- Uranus: Flush House
+
+**Upgrade Formula**
+First 3 levels: +30 chips/+3 mult, +25/+2, +20/+2
+Subsequent levels: +20 chips/+2 mult
+
+**Hand Leveling Example**
+```
+Pair Level 1: 10 chips, 2 mult
+Pair Level 2: 40 chips, 5 mult (+30, +3)
+Pair Level 3: 65 chips, 7 mult (+25, +2)
+Pair Level 4: 85 chips, 9 mult (+20, +2)
+```
 
 #### Spectral Cards (18/18 Complete)
-All 18 high-impact spectral cards fully implemented:
-- ✅ Deck enhancement (Familiar, Grim, Incantation)
-- ✅ Seal addition (Talisman, Deja Vu, Trance, Medium)
-- ✅ Edition effects (Aura)
-- ✅ Deck transformation (Sigil, Ouija, Immolate, Cryptid)
-- ✅ Joker manipulation (Wraith, Ankh, Hex, Ectoplasm, The Soul)
-- ✅ Global effects (Black Hole)
 
-**Phase:** 3C (Complete)
-**Lines Added:** ~600
-**Tests:** 35 new tests
+Spectral cards are high-impact consumables with powerful effects. Major categories:
 
-**Total Consumables:** 52/52 (100%)
-**Combined Lines:** ~1,680
-**Combined Tests:** 81 new tests
+**Deck Enhancement**
+- Familiar: Destroys 1 random card, adds 3 random Enhanced face cards
+- Grim: Destroys 1 random card, adds 3 random Enhanced Aces
+- Incantation: Destroys 1 random card, adds 4 random Enhanced numbered cards
 
----
+**Seal Addition**
+- Talisman: Adds Gold Seal to 1 selected card
+- Deja Vu: Adds Red Seal to 1 selected card
+- Trance: Adds Blue Seal to 1 selected card
+- Medium: Adds Purple Seal to 1 selected card
 
-### ✅ Boss Blind Modifiers (20/20 - 100%)
+**Edition Effects**
+- Aura: Adds Foil, Holographic, or Polychrome to 1-2 cards
 
-Complete implementation of all 20 boss modifiers across 4 categories:
+**Deck Transformation**
+- Sigil: Converts all cards in deck to 1 random suit
+- Ouija: Converts all cards in deck to 1 random rank
+- Immolate: Destroys 5 random cards, gains $20
+- Cryptid: Creates 2 copies of 1 selected card
 
-#### Category A: Simple Constraints (6/6 Complete)
-| Modifier | Effect | Status |
-|----------|--------|--------|
-| **The Wall** | ×2.5 score requirement | ✅ Complete |
-| **The Manacle** | -1 hand size | ✅ Complete |
-| **The Water** | 0 discards | ✅ Complete |
-| **The Needle** | Only 1 hand allowed | ✅ Complete |
-| **The Arm** | Decrease hand level after play | ✅ Complete |
-| **The Tooth** | Lose $1 per card played | ✅ Complete |
+**Joker Manipulation**
+- Wraith: Creates a random Rare joker (costs $0)
+- Ankh: Creates a copy of a random joker
+- Hex: Adds Polychrome to a random joker, destroys all other jokers
+- Ectoplasm: Adds Negative to a random joker, sets hand size to 1
+- The Soul: Creates a random Legendary joker (costs $0)
 
-**Phase:** 4A (Complete)
+**Global Effects**
+- Black Hole: Upgrades every poker hand by 1 level
 
-#### Category B: Card Debuffing (6/6 Complete)
-| Modifier | Effect | Status |
-|----------|--------|--------|
-| **The Club** | All Clubs debuffed | ✅ Complete |
-| **The Goad** | All Spades debuffed | ✅ Complete |
-| **The Window** | All Diamonds debuffed | ✅ Complete |
-| **The Head** | All Hearts debuffed | ✅ Complete |
-| **The Plant** | All face cards debuffed | ✅ Complete |
-| **The Flint** | Chips and mult halved | ✅ Complete |
+### Shop System
 
-**Phase:** 4B (Complete)
+Location: `core/src/shop.rs`, `core/src/voucher.rs`, `core/src/booster.rs`
 
-#### Category C: Hand/Card Restrictions (4/4 Complete)
-| Modifier | Effect | Status |
-|----------|--------|--------|
-| **The Eye** | No hand type repeats | ✅ Complete |
-| **The Mouth** | Only 1 hand type allowed | ✅ Complete |
-| **The Serpent** | First hand scores 0 | ✅ Complete |
-| **The Hook** | Discard 2 random cards after play | ✅ Complete |
+The shop system allows purchasing cards, packs, and permanent upgrades.
 
-**Phase:** 4C (Complete)
+#### Shop Configuration
 
-#### Category D: Complex Mechanics (4/4 Complete)
-| Modifier | Effect | Status |
-|----------|--------|--------|
-| **The Ox** | Leftmost card face-down | ✅ Complete |
-| **The House** | First hand has 1 card | ✅ Complete |
-| **The Wheel** | 1/7 chance cards face-down | ✅ Complete |
-| **The Pillar** | Random card selection | ✅ Complete |
+Shops have configurable slots:
+- Joker slots (default: 2)
+- Consumable slots (default: 2)
+- Pack slots (default: 2)
+- Voucher slots (default: 1)
 
-**Phase:** 4D (Complete)
+#### Pricing System
 
-**Total Boss Modifiers:** 20/20 (100%)
-**Combined Lines:** ~1,200
-**Combined Tests:** 35 new tests
+Base prices:
+- Jokers: Rarity-based (Common: $5, Uncommon: $6-8, Rare: $10, Legendary: $20)
+- Consumables: $3 (Tarots), $3 (Planets), $4 (Spectrals)
+- Booster Packs: $4-6
+- Vouchers: $10
 
----
+Price modifiers from vouchers:
+- Clearance Sale: -25%
+- Liquidation: -50%
 
-### ✅ Joker System (17/150 - 11%)
+#### Shop Actions
 
-#### Implemented Jokers (17)
-Complete with effect registry system:
-- ✅ **Mult Bonuses:** Jolly, Zany, Mad, Crazy, Droll (+4 to +10 mult)
-- ✅ **Chip Bonuses:** Sly, Wily, Clever, Devious, Crafty (+10 to +50 chips)
-- ✅ **Conditional:** Lusty (+8 mult for Hearts), Wrathful (+8 mult for Spades)
-- ✅ **Special:** Greedy (+$4 per hand), Gluttonous (+2 mult per unused discard)
+**Reroll**
+Regenerates all shop items for a cost:
+- Base cost: $5
+- Reroll Surplus voucher: -$2
+- Reroll Glut voucher: -$5
+- Cost increases by $1 each reroll per shop visit
 
-#### Not Implemented (133)
-- ❌ Complex jokers requiring advanced logic
-- ❌ Retrigger jokers
-- ❌ Deck manipulation jokers
-- ❌ Scaling/counting jokers
-- ❌ Blueprint/Brainstorm copying mechanics
+**Purchase**
+Buy items if player has sufficient funds. Items are removed from shop after purchase.
 
-**Note:** Joker expansion is low priority - current 17 jokers sufficient for RL experimentation.
-
-**Lines of Code:** ~400
-**Tests:** 17 joker-specific tests
-
----
-
-### ✅ Shop & Acquisition System (100%)
-
-Complete implementation of the shop system for purchasing jokers, consumables, and packs:
-
-#### Shop Infrastructure (100%)
-- ✅ ShopConfig with adjustable slots (jokers, consumables, packs, vouchers)
-- ✅ Dynamic pricing with voucher multipliers
-- ✅ Reroll/refresh mechanics with cost tracking
-- ✅ Purchase methods for all item types
-- ✅ Action generation for affordable items
-
-#### Booster Packs (4/4 Complete)
-| Pack Type | Contents | Status |
-|-----------|----------|--------|
-| **Arcana Pack** | 3 random Tarots | ✅ Complete |
-| **Celestial Pack** | 3 random Planets | ✅ Complete |
-| **Spectral Pack** | 3 random Spectrals | ✅ Complete |
-| **Buffoon Pack** | 2 random Jokers | ✅ Complete |
-
-- ✅ Pack opening with selection system (choose 1)
-- ✅ Random contents generation
-- ✅ PackContents enum for type safety
+**Sell**
+Sell jokers for half their purchase price (rounded up).
 
 #### Voucher System (24/24 Complete)
-All 24 vouchers with tier 1/tier 2 upgrade system:
 
-**Tier 1 Vouchers (12):**
-- ✅ Overstock (+1 shop slot)
-- ✅ Clearance Sale (-25% prices)
-- ✅ Hone (2x edition rarity)
-- ✅ Reroll (-$2 reroll cost)
-- ✅ Crystal (+1 consumable slot)
-- ✅ Telescope (Celestial Pack targeting)
-- ✅ Grabber (+1 hand per round)
-- ✅ Wasteful (+1 discard per round)
-- ✅ Tarot (2x Tarot frequency)
-- ✅ Planet (2x Planet frequency)
-- ✅ Spectral (enable Spectral cards)
-- ✅ Buffoon (2x Buffoon Pack frequency)
+Vouchers provide permanent upgrades organized in tier 1/tier 2 pairs.
 
-**Tier 2 Vouchers (12):**
-- ✅ Overstock Plus (+2 total shop slots)
-- ✅ Liquidation (-50% prices)
-- ✅ Glow Up (4x edition rarity)
-- ✅ Reroll Glut (-$5 reroll cost)
-- ✅ Illusion (+2 total consumable slots)
-- ✅ Observatory (Planet cards ×1.5)
-- ✅ Nacho Tong (+2 total hands)
-- ✅ Recyclomancy (+2 total discards)
-- ✅ Tarot Tycoon (4x Tarot frequency)
-- ✅ Planet Tycoon (4x Planet frequency)
-- ✅ Seance (2x Spectral frequency)
-- ✅ Gros Michel (4x Buffoon frequency)
+**Shop Upgrades**
+- Overstock/Overstock Plus: +1/+2 card slots in shop
+- Clearance Sale/Liquidation: -25%/-50% prices
+- Reroll Surplus/Reroll Glut: Rerolls cost -$2/-$5
 
-#### Item Generators (3/3 Complete)
-- ✅ **JokerGenerator**: Rarity-weighted (70% common, 25% uncommon, 5% rare)
-- ✅ **ConsumableGenerator**: Type-weighted with voucher modifiers
-- ✅ **PackGenerator**: Type-weighted with voucher modifiers
+**Consumable Enhancements**
+- Crystal Ball/Illusion: +1/+2 consumable slots
+- Telescope/Observatory: Celestial packs contain most-played hand / Planets give ×1.5
 
-**Phase:** 5 (Complete)
-**Lines Added:** ~1,200
-**Tests:** 37 new tests (270 total)
+**Gameplay Bonuses**
+- Grabber/Nacho Tong: +1/+2 hands per round
+- Wasteful/Recyclomancy: +1/+2 discards per round
 
----
+**Card Frequency**
+- Tarot Merchant/Tarot Tycoon: Tarots 2×/4× more common
+- Planet Merchant/Planet Tycoon: Planets 2×/4× more common
+- Omen Globe/Seance: Spectrals enabled/2× more common
+- Buffoon/Gros Michel: Buffoon packs 2×/4× more common
+- Hone/Glow Up: Editions 2×/4× more common
 
-### ✅ Alternative Decks System (93% - 14/15)
+#### Booster Packs (4/4 Complete)
 
-Complete implementation of alternative starting deck system with specialized initialization:
+Packs contain multiple cards, player chooses 1-2 to keep.
 
-#### Infrastructure (100%)
-- ✅ DeckType enum with 15 standard deck types
-- ✅ Config modifiers (hands, discards, money, slots)
-- ✅ Special deck generation logic (Abandoned, Checkered, Erratic)
-- ✅ Starting items system (vouchers, consumables, jokers)
-- ✅ Integration with Config::with_deck() factory
-- ✅ Integration with Game initialization
-- ✅ PyO3 bindings for Python support
+**Arcana Pack** ($4)
+Contains 3 random Tarot cards. Choose 1.
 
-#### Standard Decks (14/15 Complete)
+**Celestial Pack** ($4)
+Contains 3 random Planet cards. Choose 1.
+With Telescope voucher: Always contains planet for most-played hand.
 
-| Deck | Modifier | Starting Items | Status |
-|------|----------|---------------|--------|
-| **Red Deck** | +1 discard | - | ✅ Complete |
-| **Blue Deck** | +1 hand | - | ✅ Complete |
-| **Yellow Deck** | +$10 starting | - | ✅ Complete |
-| **Green Deck** | +1 hand, +1 discard, -$10 | - | ✅ Complete |
-| **Black Deck** | +1 joker slot, -1 hand | - | ✅ Complete |
-| **Magic Deck** | 2× Crystal voucher, 2× Illusion voucher | 2 Fool tarots | ✅ Complete |
-| **Nebula Deck** | 2× Planet Merchant, 2× Planet Tycoon | - | ✅ Complete |
-| **Ghost Deck** | - | 1 Hex spectral | ✅ Complete |
-| **Abandoned Deck** | - | (40 cards, no face cards) | ✅ Complete |
-| **Checkered Deck** | - | (52 cards: 26 ♠️, 26 ♥️) | ✅ Complete |
-| **Zodiac Deck** | 2× Tarot Merchant, 2× Tarot Tycoon | - | ✅ Complete |
-| **Painted Deck** | +1 hand size | - | ✅ Complete |
-| **Anaglyph Deck** | Double tag after boss blind | - | ✅ Complete |
-| **Plasma Deck** | - | - | ⚠️ Special scoring |
-| **Erratic Deck** | - | (52 random cards) | ✅ Complete |
+**Spectral Pack** ($4)
+Contains 2 random Spectral cards. Choose 1.
+Only available with Omen Globe voucher.
 
-#### Special Deck Generation (3/3 Complete)
-- ✅ **Abandoned Deck:** 40 cards (no face cards, only 2-10 + Ace)
-- ✅ **Checkered Deck:** 52 cards (26 Spades + 26 Hearts, 2 of each rank per suit)
-- ✅ **Erratic Deck:** 52 cards with completely random ranks and suits
+**Buffoon Pack** ($4)
+Contains 2 random Jokers. Choose 1.
 
-#### Plasma Deck Scoring (Deferred)
-- ⏸️ Plasma Deck requires special scoring formula: balance chips and mult
-- ⏸️ Formula: Add min(chips, mult) to max(chips, mult) instead of chips × mult
-- ⏸️ Deferred to future phase (requires scoring engine changes)
+**Mega Packs**
+Special packs from tags with more cards and choices:
+- Mega Arcana: 5 cards, choose 2
+- Mega Celestial: 5 cards, choose 2
+- Mega Standard: 5 cards, choose 2
+- Mega Buffoon: 4 jokers, choose 2
 
-**Phase:** 6 (Complete)
-**Lines Added:** ~700
-**Tests:** 29 new tests (312 total)
-**Files:** `alternative_deck.rs` (new), `config.rs` (modified), `game.rs` (modified)
+### Joker System
 
----
+Location: `core/src/joker/`
 
-### ✅ Skip Blind & Tag System (100%)
+Jokers are permanent modifiers that affect gameplay through an effect registry system.
 
-Complete implementation of skip blind and tag reward system:
+#### Joker Categories
 
-#### Infrastructure (100%)
-- ✅ SkipBlind action with validation (only Small/Big blinds)
-- ✅ Tag queue management (FIFO ordering)
-- ✅ Tag trigger system (6 trigger types)
-- ✅ Cumulative tracking (hands played, discards, blinds skipped)
-- ✅ Double Tag mechanics with stacking
-- ✅ Integration with game flow (shop, round start, boss events)
+Jokers are organized by rarity:
+- **Common**: ~70 jokers, $5
+- **Uncommon**: ~40 jokers, $6-8
+- **Rare**: ~35 jokers, $10
+- **Legendary**: ~5 jokers, $20
 
-#### Tag Types (24/24 Complete)
+#### Implementation Status
 
-**Ante 1 Tags (15):**
-- ✅ Uncommon, Rare, Foil, Holographic, Polychrome
-- ✅ Investment, Voucher, Boss, Charm, Coupon
-- ✅ Double, Juggle, D6, Economy, Speed
+Approximately 120 fully functional jokers are implemented. About 30 additional jokers are present as stubs awaiting system support (retriggers, effect copying).
 
-**Ante 2+ Tags (9):**
-- ✅ Negative, Standard, Meteor, Buffoon
-- ✅ Handy, Garbage, Ethereal, TopUp, Orbital
+#### Effect System
 
-#### Tag Effects
+Location: `core/src/effect.rs`
 
-**Immediate Triggers (11 tags):**
-- ✅ Charm, Buffoon, Meteor, Ethereal, Standard
-- ✅ Economy (doubles money, max $40)
-- ✅ Speed ($5 per blind skipped)
-- ✅ Handy ($1 per hand played)
-- ✅ Garbage ($1 per discard unused)
-- ✅ Orbital (upgrade random hand by 3 levels)
-- ✅ TopUp (create 2 common jokers)
+Jokers register effects that fire at specific game events:
 
-**Shop Triggers (9 tags):**
-- ⚠️ Uncommon, Rare (TODO: shop joker generation)
-- ⚠️ Foil, Holographic, Polychrome, Negative (TODO: edition application)
-- ✅ Voucher (adds voucher to shop)
-- ⚠️ Coupon (TODO: free shop items)
-- ⚠️ D6 (TODO: reroll cost modification)
+**Effect Types:**
+- `OnPlay`: Fires when cards are played
+- `OnDiscard`: Fires when cards are discarded
+- `OnScore`: Fires during score calculation
+- `OnHandRank`: Fires when a hand rank is made
+- `OnRoundBegin`: Fires at start of blind
+- `OnRoundEnd`: Fires at end of blind
+- `OnBlindSelect`: Fires when blind is selected
+- `OnSell`: Fires when a joker is sold
 
-**Special Mechanics:**
-- ✅ Juggle (+3 hand size next round)
-- ✅ Investment ($25 after boss defeat)
-- ⚠️ Boss (TODO: reroll boss blind)
-- ✅ Double (copies next tag, stacks additively)
-
-**Phase:** 7 (Complete)
-**Lines Added:** ~600
-**Tests:** 18 new integration tests (330 total)
-**Files:** `tag.rs` (new), `game.rs` (modified), `action.rs` (modified)
-
----
-
-### ❌ Missing Features (Not Implemented)
-
-#### Stakes / Difficulty Levels (0%)
-- ❌ 8 difficulty stakes (White → Gold)
-- ❌ Score scaling per stake
-- ❌ Sticker system (Eternal, Perishable)
-
-**Estimated Effort:** 150-200 lines
-**Priority:** Low (difficulty scaling)
-
----
-
-## Development Timeline
-
-### Phase 1: Card Enhancement System
-**Date:** 2025-10-01
-**Status:** ✅ Complete (90%)
-**Achievement:** Enhancements, editions, and seals integrated into scoring
-**Tests:** 11 new tests (71 total)
-**Lines:** ~280
-
-### Phase 2: Consumable Infrastructure
-**Date:** 2025-10-02
-**Status:** ✅ Complete (100%)
-**Achievement:** Consumable trait, targeting, inventory system
-**Tests:** Multiple phases
-**Lines:** ~400
-
-### Phase 3A: Tarot Cards
-**Date:** 2025-10-08
-**Status:** ✅ Complete (100%)
-**Achievement:** All 22 tarot effects implemented
-**Tests:** 32 new tests (135 total)
-**Lines:** ~850
-
-### Phase 3B: Planet Cards & Hand Leveling
-**Date:** 2025-10-10
-**Status:** ✅ Complete (100%)
-**Achievement:** Hand leveling system, all 12 planets functional
-**Tests:** 14 new tests (103 total)
-**Lines:** ~230
-
-### Phase 3C: Spectral Cards
-**Date:** 2025-10-12
-**Status:** ✅ Complete (100%)
-**Achievement:** All 18 spectral effects implemented
-**Tests:** 35 new tests (183 total)
-**Lines:** ~600
-
-### Phase 4A-B: Boss Modifiers (Categories A & B)
-**Date:** 2025-10-14
-**Status:** ✅ Complete (100%)
-**Achievement:** 12/20 boss modifiers (simple + debuffing)
-**Tests:** 23 new tests (206 total)
-**Lines:** ~800
-
-### Phase 4C: Boss Modifiers (Category C)
-**Date:** 2025-10-15
-**Status:** ✅ Complete (100%)
-**Achievement:** 4/20 boss modifiers (hand restrictions with state)
-**Tests:** 9 new tests (218 total)
-**Lines:** ~200
-
-### Phase 4D: Boss Modifiers (Category D)
-**Date:** 2025-10-16
-**Status:** ✅ Complete (100%)
-**Achievement:** 4/20 boss modifiers (complex mechanics, face-down cards)
-**Tests:** 15 new tests (233 total)
-**Lines:** ~200
-**Milestone:** **🎉 100% Boss Modifier Coverage Achieved (20/20)**
-
-### Phase 5: Shop & Acquisition System
-**Date:** 2025-10-17
-**Status:** ✅ Complete (100%)
-**Achievement:** Complete shop system with vouchers, packs, and item generators
-**Tests:** 37 new tests (270 total)
-**Lines:** ~1,200
-**Features:**
-- Shop configuration with dynamic slots and pricing
-- 24 vouchers (tier 1 & tier 2 system)
-- 4 booster pack types with opening mechanics
-- 3 item generators with weighted probabilities
-- Purchase mechanics and action generation
-**Milestone:** **🎉 Shop & Acquisition System Complete**
-
-### Phase 6: Alternative Decks System
-**Date:** 2025-10-17
-**Status:** ✅ Complete (93%)
-**Achievement:** All 15 standard deck types with special generation and starting items
-**Tests:** 29 new tests (312 total)
-**Lines:** ~700
-**Features:**
-- DeckType enum with 15 deck variants
-- Config modifiers for each deck (hands, discards, money, slots)
-- Special deck generation (Abandoned: 40 cards, Checkered: duplicate suits, Erratic: random)
-- Starting items system (vouchers, consumables, jokers)
-- Integration with Config::with_deck() and Game::new()
-- 29 comprehensive tests covering all deck types
-**Deferred:**
-- Plasma Deck special scoring formula (requires scoring engine refactor)
-**Milestone:** **🎉 14/15 Alternative Decks Complete**
-
-### Phase 7: Skip Blind & Tag System
-**Date:** 2025-10-17
-**Status:** ✅ Complete (100%)
-**Achievement:** Complete skip blind and tag reward system with 24 tag types
-**Tests:** 18 new integration tests (330 total)
-**Lines:** ~600
-**Features:**
-- SkipBlind action with validation (Small/Big blinds only)
-- Tag enum with all 24 tag types
-- Tag trigger system (6 trigger types: Immediate, OnShopEnter, OnRoundStart, OnBossDefeated, OnTagObtained, OnBossEncounter)
-- Tag queue management with FIFO ordering
-- Double Tag mechanics with additive stacking
-- Cumulative tracking (hands_played_count, discards, blinds_skipped_count)
-- Ante-based tag eligibility filtering (15 tags at Ante 1, 24 at Ante 2+)
-- Integration with game flow (shop entry, round start, boss defeat)
-- 18 comprehensive integration tests
-**Notable Effects:**
-- Economy Tag (doubles money, max $40)
-- Investment Tag ($25 after boss defeat)
-- Juggle Tag (+3 hand size next round)
-- Cumulative Tags (Speed, Handy, Garbage)
-- Voucher Tag (adds voucher to shop)
-**TODOs:**
-- Shop joker generation for Uncommon/Rare tags
-- Edition application for Foil/Holographic/Polychrome/Negative tags
-- Boss blind reroll for Boss tag
-- Free shop items for Coupon tag
-- Reroll cost modification for D6 tag
-**Milestone:** **🎉 Skip Blind & Tag System Complete**
-
----
-
-## Test Coverage Summary
-
-```
-Total Tests: 330 (all passing ✅)
+**Effect Registration:**
+```rust
+pub struct EffectRegistry {
+    pub on_play: Vec<Effects>,
+    pub on_discard: Vec<Effects>,
+    pub on_score: Vec<Effects>,
+    // ... other effect types
+}
 ```
 
-**Breakdown by Category:**
-- Core gameplay: ~80 tests
-- Card modifiers (Phase 1): 11 tests
-- Consumables (Phases 3A-C): 81 tests
-- Boss modifiers (Phases 4A-D): 35 tests
-- Shop & Acquisition (Phase 5): 37 tests
-- Alternative Decks (Phase 6): 29 tests
-- Skip Blind & Tags (Phase 7): 18 tests
-- Jokers: 17 tests
-- Hand detection: 20 tests
-- Miscellaneous: ~9 tests
+When jokers are purchased, their effects are registered to the appropriate event hooks. When events occur, all registered effects fire in order.
 
-**Test Quality:**
-- ✅ Unit tests for all core components
-- ✅ Integration tests for game flows
-- ✅ TDD methodology (tests written first)
-- ✅ No flaky tests
-- ✅ Full test suite runs in <1 second
+#### Example Jokers
+More joker rules can be found in `docs\reference\JOKERS.md`
+
+**Jolly Joker** (Common, $5)
++4 mult when played. Simple OnScore effect.
+
+**Greedy Joker** (Common, $5)
+Cards with Diamond suit give +4 mult. OnScore effect checking card suits.
+
+**Lusty Joker** (Common, $5)
+Cards with Heart suit give +4 mult. OnScore effect checking card suits.
+
+**Raised Fist** (Common, $5)
+Adds double the lowest ranked card in hand to mult. OnScore effect reading game state dynamically.
+
+**Four Fingers** (Uncommon, $7)
+All Flushes and Straights can be made with 4 cards. Modifies game modifiers.
+
+**Smeared Joker** (Uncommon, $6)
+Hearts and Diamonds count as the same suit, Spades and Clubs count as the same suit. Modifies hand detection.
+
+**Blueprint** (Rare, $10)
+Copies the effect of the joker to the right. Dynamic effect copying.
+
+#### Stateful Jokers
+
+Some jokers maintain internal state that changes during gameplay:
+
+**Green Joker** (Uncommon, $6)
+Starts at +1 mult, increases by +1 per hand played, decreases by -1 per discard.
+
+**Ice Cream** (Common, $5)
+Starts at +100 chips, decreases by -5 per hand played.
+
+**Popcorn** (Common, $5)
+Starts at +20 mult, decreases by -4 per round.
+
+**Constellation** (Uncommon, $6)
+Gains ×0.1 mult per Planet card used.
+
+### Tag System
+
+Location: `core/src/tag.rs`
+
+Tags are rewards obtained by skipping blinds or from special effects.
+
+#### Obtaining Tags
+
+**Skip Blind**
+When skipping Small or Big blind, player receives a random tag.
+Boss blinds cannot be skipped.
+
+**Special Effects**
+- Double Tag: Copies the next obtained tag
+- Anaglyph Deck: Grants a tag after each boss blind
+
+#### Tag Trigger System
+
+Tags trigger at different times:
+
+**Immediate Triggers**
+Execute as soon as obtained:
+- Charm, Buffoon, Meteor, Ethereal, Standard: Open mega packs
+- Economy: Doubles money (max $40)
+- Speed: $5 per blind skipped this run
+- Handy: $1 per hand played this run
+- Garbage: $1 per unused discard this run
+- Orbital: Upgrades random hand by 3 levels
+- Top Up: Creates 2 common jokers
+
+**OnShopEnter Triggers**
+Execute when entering the shop:
+- Uncommon, Rare, Foil, Holographic, Polychrome, Negative: Shop joker effects
+- Voucher: Adds a voucher to shop
+- Coupon, D6: Shop price effects
+
+**OnRoundStart Triggers**
+Execute at start of next blind:
+- Juggle: +3 hand size for next round only
+
+**OnBossDefeated Triggers**
+Execute after defeating next boss:
+- Investment: Gain $25
+
+**OnTagObtained Triggers**
+Execute when next tag is obtained:
+- Double: Copies the next tag (stacks additively with multiple Doubles)
+
+**OnBossEncounter Triggers**
+Execute before facing next boss:
+- Boss: Reroll the boss blind modifier
+
+#### Tag Queue System
+
+Tags are stored in a FIFO queue and trigger in order based on their trigger type. The Double tag has special stacking behavior where multiple Doubles accumulate.
+
+#### Ante Availability
+
+15 tags available from Ante 1.
+9 additional tags unlock at Ante 2+:
+- Negative, Standard, Meteor, Buffoon, Handy, Garbage, Ethereal, Top Up, Orbital
+
+### Alternative Deck System
+
+Location: `core/src/alternative_deck.rs`
+
+Alternative decks provide different starting conditions and modifiers.
+
+#### Implementation Status
+
+14/15 standard decks fully implemented. Plasma deck special scoring deferred.
+
+#### Deck Types
+
+**Red Deck**
++1 discard per round.
+
+**Blue Deck**
++1 hand per round.
+
+**Yellow Deck**
+Start with $10 extra.
+
+**Green Deck**
++1 hand and +1 discard per round, start with -$10.
+
+**Black Deck**
++1 joker slot, -1 hand per round.
+
+**Magic Deck**
+Start with Crystal Ball voucher, Illusion voucher, and 2 Fool tarots.
+
+**Nebula Deck**
+Start with Planet Merchant voucher and Planet Tycoon voucher.
+
+**Ghost Deck**
+Start with 1 Hex spectral card.
+
+**Abandoned Deck**
+40 cards instead of 52, no face cards (only 2-10 and Ace).
+
+**Checkered Deck**
+52 cards with only Spades and Hearts (26 of each suit), 2 of each rank per suit.
+
+**Zodiac Deck**
+Start with Tarot Merchant voucher and Tarot Tycoon voucher.
+
+**Painted Deck**
++1 hand size (can select more cards for play/discard).
+
+**Anaglyph Deck**
+Grants a random tag after defeating each boss blind.
+
+**Erratic Deck**
+52 completely random cards (any rank/suit combinations).
+
+**Plasma Deck** (not fully implemented)
+Special scoring formula: balance chips and mult.
+Formula: min(chips, mult) + max(chips, mult) instead of chips × mult.
+Requires scoring engine changes.
+
+#### Deck Initialization
+
+Decks are initialized through `Config::with_deck()` which:
+1. Sets starting game parameters (hands, discards, money, joker slots)
+2. Generates the starting deck with proper card distribution
+3. Adds starting vouchers and consumables
+4. Applies deck-specific modifiers
 
 ---
 
-## Code Statistics
+## Action Generation
 
-### Total Lines of Code
+The library provides two APIs for action generation, both implemented in `core/src/generator.rs`.
 
-| Component | Lines | Percentage |
-|-----------|-------|------------|
-| Core game logic | ~3,500 | 34% |
-| Consumables (Tarot/Planet/Spectral) | ~1,680 | 16% |
-| Shop & Acquisition (Vouchers/Packs) | ~1,200 | 12% |
-| Boss modifiers | ~1,200 | 12% |
-| Alternative Decks | ~700 | 7% |
-| Skip Blind & Tags | ~600 | 6% |
-| Jokers | ~400 | 4% |
-| Tests | ~4,200 | Not counted |
-| Supporting code | ~1,000 | 9% |
-| **Total Production Code** | **~10,280** | **100%** |
+### Iterator API
 
-### Files Modified/Created
+For flexible gameplay and testing:
 
-**Core Modules (16 files):**
-- action.rs, available.rs, card.rs, deck.rs, game.rs, generator.rs
-- hand.rs, joker.rs, rank.rs, shop.rs, space.rs, stage.rs
-- effect.rs, error.rs, config.rs, lib.rs
-
-**Consumable Modules (4 files):**
-- consumable.rs, tarot.rs, planet.rs, spectral.rs
-
-**Shop & Acquisition Modules (3 files):**
-- shop.rs, voucher.rs, booster.rs
-
-**Boss Modifier Module (1 file):**
-- boss_modifier.rs
-
-**Alternative Deck Module (1 file):**
-- alternative_deck.rs
-
-**Skip Blind & Tag Module (1 file):**
-- tag.rs
-
-**Documentation (20+ files):**
-- README.md, CLAUDE.md, PROJECT_STATUS.md
-- docs/history/ (15 phase completion documents)
-- docs/sessions/ (5 development session summaries)
-- docs/design/ (2 implementation/design documents)
-- docs/reference/ (3 game reference documents)
-
----
-
-## Architecture Highlights
-
-### Action Generation APIs
-
-**1. Iterator API** (for flexible gameplay):
 ```rust
 let actions: Vec<Action> = game.gen_moves().collect();
 ```
 
-**2. Vector API** (for RL agents):
+Returns an iterator over all legal `Action` enums at the current game state. Actions include:
+- Card selection/movement during gameplay
+- Play/discard actions
+- Shop purchases
+- Blind selection
+- Consumable usage
+- Cash out and round progression
+
+### Fixed-Size Action Space API
+
+For reinforcement learning agents requiring bounded discrete action spaces:
+
 ```rust
 let action_space: ActionSpace = game.gen_action_space();
-let masked = action_space.unmask();  // Fixed-size Vec<bool> (length 79)
+let mask: Vec<bool> = action_space.unmask();
 ```
 
-### Effect Registry System
+Returns a fixed-size `ActionSpace` with 79 dimensions where each index maps to a potential action type:
+- Indices 0-51: Card selections
+- Indices 52-53: Play/Discard
+- Indices 54-60: Joker/consumable purchases
+- Remaining indices: Other game actions
 
-Jokers register callbacks that fire on events:
-```rust
-pub struct EffectRegistry {
-    pub on_play: Vec<Box<dyn Fn(&mut Game)>>,
-    pub on_discard: Vec<Box<dyn Fn(&mut Game)>>,
-    pub on_score: Vec<Box<dyn Fn(&mut Game)>>,
-    pub on_hand_rank: Vec<Box<dyn Fn(&mut Game, HandRank)>>,
-}
-```
+The `unmask()` method returns a boolean vector indicating which actions are legal at the current state.
 
-### Consumable Trait System
+### Action Validation
 
-Unified interface for all consumables:
-```rust
-pub trait Consumable {
-    fn name(&self) -> String;
-    fn desc(&self) -> String;
-    fn cost(&self) -> usize;
-    fn requires_target(&self) -> bool;
-    fn max_targets(&self) -> usize;
-    fn use_effect(&self, game: &mut Game, targets: Option<Vec<Card>>) -> Result<(), GameError>;
-    fn consumable_type(&self) -> ConsumableType;
-}
-```
-
-### Boss Modifier Query Methods
-
-Clean, composable interface:
-```rust
-impl BossModifier {
-    pub fn score_multiplier(&self) -> f64;
-    pub fn hand_size_modifier(&self) -> i32;
-    pub fn is_card_debuffed(&self, card: &Card) -> bool;
-    pub fn halves_score(&self) -> bool;
-    pub fn leftmost_face_down(&self) -> bool;
-    pub fn face_down_probability(&self) -> f64;
-    // ... 14 more query methods
-}
-```
+Actions are validated before execution. Invalid actions return `GameError` with:
+- `InvalidAction`: Action not legal in current stage
+- `InsufficientFunds`: Not enough money for purchase
+- `InvalidTarget`: Invalid card targets for consumable
+- `Other`: Miscellaneous validation errors
 
 ---
 
-## Performance Characteristics
+## Implementation Status
 
-### Benchmarks
-- **Action generation:** ~50-100μs per call
-- **Game simulation:** ~1000 games/second
-- **Scoring calculation:** <1μs per hand
-- **Test suite:** <1 second for 233 tests
+### Core Systems: Complete
 
-### Memory Usage
-- **Game state:** ~2-4 KB
-- **Deck:** ~1 KB (52 cards)
-- **Action space:** ~80 bytes (fixed size)
-- **Effect registry:** <1 KB
+- Poker hand detection (all 13 ranks)
+- Hand leveling and scoring
+- Stage progression and game loop
+- Blind system with score requirements
+- Money and interest system
+- Card dealing and hand management
+- Action validation and execution
 
-### Complexity
-- **Hand detection:** O(n log n) where n = cards in hand (typically 5)
-- **Action generation:** O(m) where m = available cards (typically 8)
-- **Boss modifier checks:** O(1) pattern matching
-- **Consumable effects:** O(n) where n = deck size (typically 52)
+### Boss Modifiers: 20/20 Complete
 
-**Performance Impact of New Features:**
-- Boss modifiers: Negligible (<1% overhead)
-- Face-down cards: O(n) filter in hand detection
-- Consumables: Variable based on effect (typically <1ms)
+All 20 boss blind modifiers fully implemented:
+- Category A (Simple Constraints): 6/6
+- Category B (Card Debuffing): 6/6
+- Category C (Hand Restrictions): 4/4
+- Category D (Complex Mechanics): 4/4
+
+### Card Modifiers: 95% Complete
+
+**Enhancements:** 6/8
+- Implemented: Bonus, Mult, Stone, Glass, Steel, Gold
+- Not implemented: Wild, Lucky
+
+**Editions:** 4/4
+- All implemented: Base, Foil, Holographic, Polychrome, Negative
+
+**Seals:** 4/4
+- All implemented: Gold, Red, Blue, Purple
+
+### Consumables: 52/52 Complete
+
+- Tarot cards: 22/22
+- Planet cards: 12/12
+- Spectral cards: 18/18
+
+### Shop System: Complete
+
+- Vouchers: 24/24 (12 tier 1, 12 tier 2)
+- Booster packs: 4/4
+- Shop mechanics: Purchase, sell, reroll
+- Dynamic pricing with voucher modifiers
+
+### Jokers: ~120 Functional
+
+Approximately 120 jokers fully functional with effect system.
+About 30 additional jokers present as stubs requiring:
+- Retrigger system
+- Effect copying
+- Complex state management
+- Additional lifecycle hooks
+
+### Alternative Decks: 14/15 Complete
+
+All standard decks except Plasma deck special scoring.
+
+### Skip Blind & Tags: 24/24 Complete
+
+All tag types implemented with trigger system and queue management.
+
+### Not Implemented
+
+**Stakes System** (0/8)
+Difficulty levels not implemented.
+
+**Wild/Lucky Enhancements**
+Wild suit matching and Lucky probability effects deferred.
+
+**Plasma Deck Scoring**
+Special scoring formula requires scoring engine refactor.
+
+**Advanced Joker Systems**
+Some jokers require retrigger system, effect copying, or complex mechanics not yet implemented.
 
 ---
 
-## Python Bindings (PyO3)
+## Development Information
 
-### Status
-✅ Functional Python bindings with PyO3
+### Test Coverage
 
-### Features
-- ✅ Game state exposed to Python
-- ✅ Action generation in Python
-- ✅ OpenAI Gym environment wrapper
-- ✅ Serialization support
-- ⏸️ Some recent features may need binding updates
+Total: 420+ tests passing
 
-### Usage
+**Test Categories:**
+- Core gameplay: ~80 tests
+- Card modifiers: 11 tests
+- Consumables: 81 tests
+- Boss modifiers: 35 tests
+- Shop system: 37 tests
+- Alternative decks: 29 tests
+- Tags: 18 tests
+- Jokers: 100+ tests
+- Hand detection: 20 tests
+- Miscellaneous: ~9 tests
+
+**Test Quality:**
+- Unit tests for all core components
+- Integration tests for game flows
+- No flaky tests
+- Full suite runs in <1 second
+
+### Performance Characteristics
+
+**Benchmarks:**
+- Action generation: ~50-100μs per call
+- Game simulation: ~1000 games/second
+- Scoring calculation: <1μs per hand
+- Test suite: <1 second for 420+ tests
+
+**Memory Usage:**
+- Game state: ~2-4 KB
+- Deck: ~1 KB (52 cards)
+- Action space: ~80 bytes (fixed size)
+- Effect registry: <1 KB
+
+### Code Statistics
+
+**Total Production Code:** ~10,280 lines
+
+By component:
+- Core game logic: ~3,500 lines (34%)
+- Consumables: ~1,680 lines (16%)
+- Shop & acquisition: ~1,200 lines (12%)
+- Boss modifiers: ~1,200 lines (12%)
+- Alternative decks: ~700 lines (7%)
+- Skip blind & tags: ~600 lines (6%)
+- Jokers: ~400 lines (4%)
+- Supporting code: ~1,000 lines (9%)
+
+**Core Modules** (25 files):
+action.rs, alternative_deck.rs, ante.rs, available.rs, booster.rs, boss_modifier.rs, card.rs, config.rs, consumable.rs, deck.rs, effect.rs, error.rs, game.rs, generator.rs, hand.rs, joker/, planet.rs, rank.rs, shop.rs, space.rs, spectral.rs, stage.rs, tag.rs, tarot.rs, voucher.rs
+
+### Python Bindings
+
+Status: Functional with PyO3
+
+**Features:**
+- Game state exposed to Python
+- Action generation in Python
+- OpenAI Gym environment wrapper
+- Serialization support
+
+**Usage Example:**
 ```python
 import pylatro
 
@@ -710,7 +1048,7 @@ while not game.is_over():
 result = game.result()
 ```
 
-### Gym Environment
+**Gym Environment:**
 ```python
 import gym
 import pylatro.gym
@@ -724,378 +1062,112 @@ while not done:
     obs, reward, done, info = env.step(action)
 ```
 
----
+### Documentation
 
-## Use Cases & Applications
+**Available Documentation:**
+- `README.md`: Project overview
+- `CLAUDE.md`: AI assistant instructions
+- `PROJECT_STATUS.md`: This document
+- `docs/reference/`: Game rules and feature references
+- `docs/history/`: Phase completion documents
+- `docs/sessions/`: Development session summaries
+- `docs/design/`: Implementation plans
 
-### 1. Reinforcement Learning
-**Primary Goal:** Train RL agents to play Balatro optimally
+### Use Cases
 
-**Supported:**
-- ✅ Exhaustive action generation
-- ✅ Fixed-size action space for neural networks
-- ✅ Deterministic game logic
-- ✅ Fast simulation (1000+ games/second)
-- ✅ Rich state space with modifiers
+**1. Reinforcement Learning**
+Primary goal: Train RL agents to play Balatro optimally.
 
-**RL-Ready Features:**
-- Boss modifiers (20 different challenges)
-- Consumables (52 strategic options)
-- Hand leveling (long-term planning)
-- Card modifiers (scoring optimization)
+Supported features:
+- Exhaustive action generation
+- Fixed-size action space for neural networks
+- Deterministic game logic
+- Fast simulation (1000+ games/second)
+- Rich state space with modifiers
 
-### 2. Game Analysis
-- Monte Carlo simulations
-- Strategy evaluation
-- Balance testing
-- Win rate analysis by configuration
+**2. Game Analysis**
+Monte Carlo simulations, strategy evaluation, balance testing, win rate analysis.
 
-### 3. Bot Development
-- AI opponents for testing
-- Heuristic strategy implementation
-- Benchmark comparisons
+**3. Bot Development**
+AI opponents for testing, heuristic strategy implementation, benchmark comparisons.
 
-### 4. Educational
-- Learn Rust game development
-- Study RL environments
-- Explore game state machines
+**4. Educational**
+Learn Rust game development, study RL environments, explore game state machines.
 
----
+### Building & Testing
 
-## Known Limitations
-
-### 1. Incomplete Joker Coverage
-**Impact:** Medium
-**Current:** 17/150 jokers (11%)
-**Reason:** Many jokers require complex mechanics not needed for RL
-**Workaround:** Implemented jokers cover main archetypes
-
-### 2. No Voucher System
-**Impact:** Low
-**Current:** 0% implementation
-**Reason:** Permanent upgrades less critical for RL training
-**Future:** May add in Phase 6 if needed
-
-### 3. No Alternative Decks/Stakes
-**Impact:** Low
-**Current:** 0% implementation
-**Reason:** Variety features, not core mechanics
-**Future:** Can add for curriculum learning
-
-### 4. Wild Card Suit Matching
-**Impact:** Low
-**Current:** Wild enhancement exists but doesn't work in flushes
-**Reason:** Complex hand detection changes
-**Future:** Phase 1.1 (deferred)
-
-### 5. Lucky Enhancement Probability
-**Impact:** Low
-**Current:** Lucky enhancement exists but probability not implemented
-**Reason:** Needs seeded RNG for RL determinism
-**Future:** Phase 1.1 (deferred)
-
----
-
-## Comparison to Full Balatro
-
-### What's Implemented (Balatro Parity)
-
-| Feature | balatro-rs | Balatro |
-|---------|------------|---------|
-| **Core Poker Gameplay** | ✅ 100% | ✅ |
-| **13 Hand Ranks** | ✅ 100% | ✅ |
-| **Blind Progression** | ✅ 100% | ✅ |
-| **Boss Modifiers** | ✅ 100% (20/20) | ✅ |
-| **Ante System** | ✅ Up to Ante 8 | ✅ Up to Ante 8 |
-| **Tarot Cards** | ✅ 100% (22/22) | ✅ |
-| **Planet Cards** | ✅ 100% (12/12) | ✅ |
-| **Spectral Cards** | ✅ 100% (18/18) | ✅ |
-| **Card Enhancements** | ✅ 75% (6/8) | ✅ |
-| **Card Editions** | ✅ 100% (4/4) | ✅ |
-| **Card Seals** | ✅ 100% (4/4) | ✅ |
-| **Jokers** | ⚠️ 11% (17/150) | ✅ |
-| **Vouchers** | ✅ 100% (24/24) | ✅ |
-| **Booster Packs** | ✅ 100% (4/4) | ✅ |
-| **Shop System** | ✅ 100% | ✅ |
-| **Alternative Decks** | ✅ 93% (14/15) | ✅ |
-| **Skip Blind & Tags** | ✅ 100% (24/24) | ✅ |
-| **Stakes** | ❌ 0% (0/8) | ✅ |
-
-### Overall Feature Parity: ~82%
-
-**Core Mechanics:** ~98% parity
-**Advanced Features:** ~88% parity (Tags added)
-**Variety Features:** ~70% parity (Alternative Decks + Tags)
-
----
-
-## Roadmap & Future Work
-
-### Short Term (Next 1-2 Phases)
-
-**Phase 6: Alternative Decks (Complete ✅)**
-- ✅ All 15 standard deck types implemented
-- ✅ Special deck generation (Abandoned, Checkered, Erratic)
-- ✅ Starting items system
-- ✅ Config and Game integration
-- ⏸️ Plasma Deck special scoring (deferred)
-
-**Phase 7: Skip Blind & Tag System (Complete ✅)**
-- ✅ SkipBlind action with validation
-- ✅ All 24 tag types implemented
-- ✅ Tag trigger system (6 trigger types)
-- ✅ FIFO tag queue management
-- ✅ Double Tag mechanics
-- ✅ Cumulative tracking system
-- ✅ Integration with game flow
-- ⏸️ Some shop tags deferred (Uncommon, Rare, Edition, Coupon, D6)
-
-**Phase 8: Stakes System (Next)**
-- 8 difficulty stakes (White → Gold)
-- Score scaling per stake
-- Stake-specific modifiers
-- **Estimated:** 150-200 lines, 2-3 weeks
-
-### Medium Term (Future Phases)
-
-**Joker Expansion (Optional)**
-- Additional 50-100 jokers
-- Complex mechanics (Blueprint, Brainstorm)
-- Retrigger systems
-- **Estimated:** 1000+ lines, 6-8 weeks
-
-**Alternative Decks & Stakes (Optional)**
-- 15 starting deck types
-- 8 difficulty stakes
-- Sticker system
-- **Estimated:** 350-500 lines, 3-4 weeks
-
-### Long Term (Nice to Have)
-
-**Advanced Features:**
-- Seeded runs for replay
-- Save/load game state
-- Tournament mode
-- Leaderboards
-
-**Polish:**
-- Wild card suit matching (Phase 1.1)
-- Lucky enhancement (Phase 1.1)
-- Discovery system for secret planets
-- Performance optimizations
-
----
-
-## Getting Started
-
-### Build & Test
-
+**Build Entire Workspace:**
 ```bash
-# Build entire workspace
 cargo build
-
-# Run all tests
-cargo test
-
-# Run core tests only
-cargo test -p balatro-rs
-
-# Run specific test
-cargo test test_boss_the_pillar
 ```
 
-### Python Development
-
+**Run All Tests:**
 ```bash
-# Build Python bindings
+cargo test
+```
+
+**Run Core Tests:**
+```bash
+cargo test -p balatro-rs
+```
+
+**Run Specific Test:**
+```bash
+cargo test test_game_gen_actions
+```
+
+**Run Benchmarks:**
+```bash
+cargo bench -p balatro-rs
+```
+
+**Python Development:**
+```bash
 cd pylatro
 maturin develop
-
-# Run Python examples
 python examples/simulation.py
-
-# Run Python tests
 python test/main.py
 ```
 
-### CLI
-
+**CLI:**
 ```bash
-# Build and run CLI
 cargo run -p cli
 ```
 
----
+### Feature Flags
 
-## Documentation
-
-### Available Documentation
-
-**Project Documentation:**
-- `README.md` - Project overview and examples
-- `PROJECT_STATUS.md` - This document (comprehensive status)
-- `CLAUDE.md` - AI assistant instructions
-- `docs/reference/BALATRO_BASIC_RULES.md` - Game rules reference
-- `docs/reference/MISSING_FEATURES_DETAILED.md` - Detailed missing feature list
-- `docs/reference/JOKERS.md` - Complete joker reference
-
-**Phase Completion Documents (docs/history/):**
-- `PHASE_1_COMPLETION.md` - Card enhancement system
-- `PHASE_2_COMPLETION.md` - Consumable infrastructure
-- `PHASE_3A_COMPLETION.md` - Tarot cards
-- `PHASE_3B_COMPLETION.md` - Planet cards & hand leveling
-- `PHASE_3C_COMPLETION.md` - Spectral cards
-- `PHASE_4_COMPLETION.md` - Boss modifiers (A & B)
-- `PHASE_4C_COMPLETION.md` - Boss modifiers (Category C)
-- `PHASE_4D_COMPLETION.md` - Boss modifiers (Category D)
-- Plus planning documents for each phase
-
-**Code Documentation:**
-- Inline documentation in all modules
-- Doc comments for public APIs
-- Examples in doc comments
-- Test documentation
-
----
-
-## Contributing
-
-### Development Workflow
-
-1. **Read documentation** - Understand current implementation
-2. **Write tests first** - Follow TDD methodology
-3. **Implement feature** - Keep code clean and documented
-4. **Run full test suite** - Ensure no regressions
-5. **Update documentation** - Keep PROJECT_STATUS.md current
-
-### Code Style
-
-- Follow Rust conventions
-- Use `cargo fmt` for formatting
-- Run `cargo clippy` for linting
-- Add inline comments for complex logic
-- Write doc comments for public APIs
-
-### Testing Standards
-
-- Write unit tests for all new functions
-- Write integration tests for new features
-- Aim for >80% code coverage
-- No flaky tests
-- Tests must be deterministic
-
----
-
-## Success Metrics
-
-### Completed Milestones
-
-✅ **Core gameplay functional** (Phase 0)
-✅ **Card modifiers integrated** (Phase 1)
-✅ **Consumable system complete** (Phase 2)
-✅ **All 52 consumables implemented** (Phases 3A-C)
-✅ **Boss modifiers 100% complete** (Phases 4A-D)
-✅ **Shop & Acquisition system complete** (Phase 5)
-✅ **Alternative Decks 93% complete** (Phase 6)
-✅ **Skip Blind & Tag System 100% complete** (Phase 7)
-✅ **330 tests passing** (Current)
-✅ **Python bindings functional** (Ongoing)
-
-### Key Achievements
-
-- **20/20 boss modifiers** (100% coverage)
-- **52/52 consumables** (100% coverage)
-- **24/24 vouchers** (100% coverage)
-- **24/24 tags** (100% coverage)
-- **4/4 booster packs** (100% coverage)
-- **14/15 alternative decks** (93% coverage)
-- **13/13 hand ranks** (100% coverage)
-- **4/4 card editions** (100% coverage)
-- **4/4 card seals** (100% coverage)
-- **Fast simulation** (1000+ games/second)
-- **Comprehensive testing** (330 tests)
-- **Clean architecture** (modular, extensible)
-
----
-
-## Project Health
-
-### Build Status
-✅ **All builds passing**
-
-### Test Status
-✅ **330/330 tests passing** (100%)
-
-### Code Quality
-✅ **No clippy warnings** (when configured)
-✅ **Consistent formatting** (rustfmt)
-✅ **Documented APIs** (doc comments)
-✅ **Type safety** (strong Rust typing)
-
-### Technical Debt
-⚠️ **Low to Medium**
-- Wild/Lucky enhancements deferred (Phase 1.1)
-- Some jokers incomplete (11% coverage)
-- Python bindings may need updates for recent features
-
-### Maintainability
-✅ **High**
-- Modular architecture
-- Clear separation of concerns
-- Comprehensive tests
-- Good documentation
-
----
-
-## Contact & Resources
-
-### Project Links
-- **Repository:** `balatro-rs/`
-- **Documentation:** `docs/` directory
-- **Python Bindings:** `pylatro/` directory
-- **CLI:** `cli/` directory
-
-### Related Documents
-- See `docs/history/` for detailed phase completion reports
-- See `docs/sessions/` for development session summaries
-- See `docs/design/` for implementation plans and design documents
-- See `docs/reference/` for game rules and feature references
-- See `CLAUDE.md` for AI assistant guidelines
-- See `docs/reference/MISSING_FEATURES_DETAILED.md` for feature details
+The core crate supports optional features:
+- `serde`: Enable serialization/deserialization
+- `python`: Enable PyO3 bindings (default on)
+- `colored`: Enable colored output for display
 
 ---
 
 ## Summary
 
-balatro-rs has achieved significant progress with **core gameplay 100% functional**, **all consumables implemented (52/52)**, **complete boss modifier coverage (20/20)**, **complete shop & acquisition system (24 vouchers, 4 packs)**, **alternative decks system (14/15)**, **skip blind & tag system (24/24)**, and **330 comprehensive tests passing**. The project is well-suited for RL experimentation with fast simulation, exhaustive action generation, and rich state space.
+balatro-rs is a comprehensive Rust implementation of Balatro with approximately 82% feature parity to the full game. The codebase provides:
+
+**Complete Systems:**
+- All core gameplay mechanics
+- All 20 boss blind modifiers
+- All 52 consumable cards
+- Complete shop system with 24 vouchers
+- 14/15 alternative decks
+- All 24 tag types
+- Approximately 120 functional jokers
 
 **Key Strengths:**
-- ✅ Solid architecture with clean abstractions
-- ✅ Comprehensive test coverage (330 tests)
-- ✅ Fast performance (1000+ games/second)
-- ✅ All critical gameplay mechanics functional
-- ✅ Full shop system with vouchers and packs
-- ✅ Alternative deck system (14/15 decks)
-- ✅ Complete tag system (24/24 tags)
-- ✅ Ready for RL training and experimentation
+- Solid architecture with clean abstractions
+- Comprehensive test coverage (420+ tests)
+- Fast performance (1000+ games/second)
+- Ready for RL training and experimentation
+- Complete Python bindings
 
-**Current Focus:**
-- ✅ Phase 5 complete (Shop & Acquisition System)
-- ✅ Phase 6 complete (Alternative Decks - 93%)
-- ✅ Phase 7 complete (Skip Blind & Tag System - 100%)
-- ✅ 14/15 alternative decks implemented
-- ✅ 24/24 tags implemented
-- 🎯 ~82% feature parity with full Balatro
+**Suitable For:**
+- Reinforcement learning research
+- Game strategy analysis
+- Bot development
+- Educational purposes
+- Balatro game engine applications
 
-**Next Priorities:**
-- Optional: Stakes system for difficulty scaling
-- Optional: Plasma Deck special scoring
-- Optional: Additional jokers
-- Continue: RL algorithm development and training
-
----
-
-**Project Status: ✅ PRODUCTION-READY FOR RL**
-**Version:** Core v0.0.1
-**Last Updated:** 2025-10-17
-**Maintainer:** Active development
+The codebase is well-documented, thoroughly tested, and actively maintained. With its exhaustive move generation and fixed-size action space API, it serves as an ideal platform for applying reinforcement learning techniques to Balatro gameplay.

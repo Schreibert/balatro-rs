@@ -35,28 +35,37 @@ fn main() {
 
 ## Features
 
-This library does not implement all aspects of balatro and likely never will.
+This library does not yet implement all aspects of Balatro.
 
-The follow features are implemented (including move generation)
-- [x] identification and scoring of poker hands
+The following features are implemented (including move generation):
+- [x] identification and scoring of poker hands (all 13 hand ranks)
 - [x] playing/discarding/reordering of cards
 - [x] blind pass/fail and game win/lose conditions
 - [x] money/interest generation
 - [x] ante progression (up to ante 8)
 - [x] blind progression (small, big, boss)
 - [x] stage transition (pre-blind, blind, post-blind, shop)
-- [x] buying/selling/using jokers (very partial support)
+- [x] boss blind modifiers (all 20 modifiers)
+- [x] buying/selling/using jokers (~120 functional jokers)
+- [x] buying/selling/using tarots (all 22 tarot cards)
+- [x] buying/selling/using planets (all 12 planet cards)
+- [x] buying/selling/using spectrals (all 18 spectral cards)
+- [x] card enhancements (6/8 - bonus, mult, stone, glass, steel, gold)
+- [x] card editions (foil, holographic, polychrome, negative)
+- [x] card seals (red, gold, blue, purple)
+- [x] voucher system (all 24 vouchers)
+- [x] booster packs (arcana, celestial, spectral, buffoon)
+- [x] skip blind/tags (all 24 tag types)
+- [x] alternative decks (14/15 standard decks)
 
-The following features are missing and may or may not be added
-- [ ] buying/selling/using tarots
-- [ ] buying/selling/using planets
-- [ ] buying/selling/using spectrals
-- [ ] boss blind modifiers
-- [ ] skip blind/tags
-- [ ] card enhancements, foils and seals
-- [ ] joker foils 
-- [ ] alternative decks
-- [ ] alternative stakes
+The following features are missing and may or may not be added:
+- [ ] wild and lucky card enhancements
+- [ ] stakes (difficulty levels)
+- [ ] remaining ~30 jokers (some require new systems)
+- [ ] plasma deck special scoring
+- [ ] some complex joker mechanics (retriggers, effect copying)
+
+See [PROJECT_STATUS.md](PROJECT_STATUS.md) for detailed feature breakdown and [docs/reference/MISSING_FEATURES_DETAILED.md](docs/reference/MISSING_FEATURES_DETAILED.md) for comprehensive missing feature list.
 
 
 ## Python bindings
