@@ -42,6 +42,7 @@ pub enum Action {
     SelectBlind(Blind),
     SkipBlind(), // Skip Small or Big blind for a tag
     SelectFromTagPack(usize), // Select an item from a pending tag pack by index
+    SellJoker(Jokers), // Sell a joker during shop phase
 }
 
 impl fmt::Display for Action {
@@ -91,6 +92,9 @@ impl fmt::Display for Action {
             }
             Self::SelectFromTagPack(index) => {
                 write!(f, "SelectFromTagPack: index {}", index)
+            }
+            Self::SellJoker(joker) => {
+                write!(f, "SellJoker: {}", joker)
             }
         }
     }

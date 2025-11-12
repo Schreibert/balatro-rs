@@ -31,6 +31,28 @@ pub struct RoundState {
     // Round tracking
     pub hands_played_this_round: HashSet<HandRank>,
     pub consecutive_hands_without_faces: usize,
+    pub jacks_discarded_this_round: usize,
+}
+
+/// Game rule modifiers applied by jokers
+#[derive(Debug, Clone, Default)]
+pub struct GameModifiers {
+    // Hand detection modifiers
+    pub four_card_straights: bool,      // Four Fingers joker
+    pub four_card_flushes: bool,        // Four Fingers joker
+    pub all_cards_are_faces: bool,      // Pareidolia joker
+    pub smeared_suits: bool,            // Smeared Joker
+    pub gap_straights: bool,            // Shortcut joker
+
+    // Scoring modifiers
+    pub all_cards_score: bool,          // Splash joker
+
+    // Hand/discard modifiers
+    pub hand_size_bonus: i32,           // Juggler (+1), Merry Andy (-1), etc.
+    pub discard_bonus: i32,             // Merry Andy (+3), Drunkard (+1), etc.
+
+    // Economy modifiers
+    pub min_money: i32,                 // Credit Card (-20), allows going into debt
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +78,7 @@ pub struct Game {
     // consumables
     pub consumables: Vec<Consumables>,
     pub last_consumable_used: Option<Consumables>,
+    pub unique_planets_used: HashSet<HandRank>, // Track unique Planet cards used (for Satellite joker)
 
     // vouchers
     pub vouchers: Vec<crate::voucher::Vouchers>,
@@ -97,6 +120,9 @@ pub struct Game {
     pub hand: Vec<Card>,                           // Current cards in player's hand
     pub round_state: RoundState,                   // Per-round state for stateful jokers
     pub hand_rank_play_counts: HashMap<HandRank, usize>,  // Count of times each hand rank has been played (for Supernova)
+
+    // Phase 9: Game Rule Modifiers
+    pub modifiers: GameModifiers,                  // Rule changes from jokers (4-card hands, etc.)
 }
 
 impl Game {
@@ -154,6 +180,7 @@ impl Game {
             effect_registry: EffectRegistry::new(),
             consumables: starting_consumables,
             last_consumable_used: None,
+            unique_planets_used: HashSet::new(),
             vouchers: starting_vouchers,
             hand_levels,
             blind: None,
@@ -185,6 +212,7 @@ impl Game {
             hand: Vec::new(),
             round_state: RoundState::default(),
             hand_rank_play_counts: HashMap::new(),
+            modifiers: GameModifiers::default(),
             config,
         }
     }
@@ -212,6 +240,14 @@ impl Game {
         self.score = self.config.base_score;
         self.plays = self.config.plays;
         self.discards = self.config.discards;
+
+        // Apply discard modifiers from jokers
+        if self.modifiers.discard_bonus >= 0 {
+            self.discards += self.modifiers.discard_bonus as usize;
+        } else {
+            self.discards = self.discards.saturating_sub(self.modifiers.discard_bonus.abs() as usize);
+        }
+
         self.discards_total += self.config.discards; // Track total discards available for Garbage Tag
         // Reset Category C boss modifier state
         self.played_hand_ranks.clear();
@@ -271,6 +307,48 @@ impl Game {
         self.round_state.consecutive_hands_without_faces = 0;
     }
 
+    /// Update game modifiers based on active jokers
+    pub fn update_modifiers(&mut self) {
+        // Reset all modifiers
+        self.modifiers = GameModifiers::default();
+
+        // Check each joker and set corresponding modifier
+        for joker in &self.jokers {
+            match joker {
+                crate::joker::Jokers::FourFingers(_) => {
+                    self.modifiers.four_card_straights = true;
+                    self.modifiers.four_card_flushes = true;
+                }
+                crate::joker::Jokers::Pareidolia(_) => {
+                    self.modifiers.all_cards_are_faces = true;
+                }
+                crate::joker::Jokers::SmearedJoker(_) => {
+                    self.modifiers.smeared_suits = true;
+                }
+                crate::joker::Jokers::Splash(_) => {
+                    self.modifiers.all_cards_score = true;
+                }
+                crate::joker::Jokers::Shortcut(_) => {
+                    self.modifiers.gap_straights = true;
+                }
+                crate::joker::Jokers::MerryAndy(_) => {
+                    self.modifiers.discard_bonus += 3;
+                    self.modifiers.hand_size_bonus -= 1;
+                }
+                crate::joker::Jokers::Juggler(_) => {
+                    self.modifiers.hand_size_bonus += 1;
+                }
+                crate::joker::Jokers::Drunkard(_) => {
+                    self.modifiers.discard_bonus += 1;
+                }
+                crate::joker::Jokers::CreditCard(_) => {
+                    self.modifiers.min_money = -20;
+                }
+                _ => {}
+            }
+        }
+    }
+
     // shuffle and deal new cards to available
     pub(crate) fn deal(&mut self) {
         // add discarded back to deck, emptying in process
@@ -281,7 +359,7 @@ impl Game {
         self.deck.shuffle();
 
         // The House: first hand dealt with 1 card
-        let cards_to_draw = if let Some(modifier) = self.stage.boss_modifier() {
+        let base_cards = if let Some(modifier) = self.stage.boss_modifier() {
             if modifier.first_hand_one_card() && self.first_deal_this_blind {
                 self.first_deal_this_blind = false; // Mark first deal as done
                 1
@@ -290,6 +368,13 @@ impl Game {
             }
         } else {
             self.config.available
+        };
+
+        // Apply hand size modifiers from jokers
+        let cards_to_draw = if self.modifiers.hand_size_bonus >= 0 {
+            base_cards + self.modifiers.hand_size_bonus as usize
+        } else {
+            base_cards.saturating_sub(self.modifiers.hand_size_bonus.abs() as usize)
         };
 
         self.draw(cards_to_draw);
@@ -361,7 +446,12 @@ impl Game {
         }
 
         let selected = SelectHand::new(self.available.selected());
-        let best = selected.best_hand()?;
+
+        // Create context with game modifiers for hand detection
+        let context = crate::hand::HandContext {
+            modifiers: &self.modifiers,
+        };
+        let best = selected.best_hand_with_context(&context)?;
 
         // The Mouth: check if hand matches the allowed hand type
         if let Some(modifier) = self.stage.boss_modifier() {
@@ -399,10 +489,21 @@ impl Game {
 
         let score = self.calc_score(best.clone());
 
-        // Trigger stateful joker updates for hand played (Green Joker)
+        // Trigger stateful joker updates for hand played (Green Joker, Loyalty Card, Obelisk)
+        // Find most-played hand rank for Obelisk
+        let most_played_rank = self.hand_rank_play_counts.iter()
+            .max_by_key(|(_, count)| *count)
+            .map(|(rank, _)| *rank);
+
         for joker in &mut self.jokers {
             if let crate::joker::Jokers::GreenJoker(ref mut j) = joker {
                 j.on_hand_played();
+            }
+            if let crate::joker::Jokers::LoyaltyCard(ref mut j) = joker {
+                j.on_hand_played();
+            }
+            if let crate::joker::Jokers::Obelisk(ref mut j) = joker {
+                j.on_hand_played(best.rank, most_played_rank);
             }
         }
 
@@ -470,6 +571,19 @@ impl Game {
             }
         }
 
+        // Track jacks discarded for Hit the Road joker
+        let jacks_discarded = selected_cards.iter().filter(|c| c.value == crate::card::Value::Jack).count();
+        self.round_state.jacks_discarded_this_round += jacks_discarded;
+
+        // Mail-In Rebate: Earn $3 for each discarded rank card
+        if let Some(rebate_rank) = self.round_state.mail_rebate_rank {
+            let has_mail_rebate = self.jokers.iter().any(|j| matches!(j, crate::joker::Jokers::MailInRebate(_)));
+            if has_mail_rebate {
+                let matching_cards = selected_cards.iter().filter(|c| c.value == rebate_rank).count();
+                self.money += matching_cards * 3;
+            }
+        }
+
         // Remove discarded cards from hand tracking
         for card in &selected_cards {
             if let Some(pos) = self.hand.iter().position(|c| c == card) {
@@ -505,7 +619,14 @@ impl Game {
         let mut seal_money = 0;
         let mut cards_played_count = 0;
 
-        for card in hand.hand.cards().iter() {
+        // Use all cards if Splash joker modifier is active, otherwise just scoring cards
+        let cards_to_score = if self.modifiers.all_cards_score {
+            &hand.all
+        } else {
+            &hand.hand.cards()
+        };
+
+        for card in cards_to_score.iter() {
             // Check if card is debuffed by boss modifier
             let is_debuffed = boss_modifier
                 .map(|m| m.is_card_debuffed(card))
@@ -518,6 +639,9 @@ impl Game {
                 if card.has_retrigger() {
                     trigger_count += 1;
                 }
+
+                // Jokers can add retrigger bonuses
+                trigger_count += self.get_joker_retrigger_bonus(card);
 
                 for _ in 0..trigger_count {
                     // Add chips from card (includes enhancement and edition bonuses)
@@ -542,7 +666,7 @@ impl Game {
 
         // Apply mult multipliers from enhancements and editions (only non-debuffed cards)
         let mut total_multiplier = 1.0;
-        for card in hand.hand.cards().iter() {
+        for card in cards_to_score.iter() {
             let is_debuffed = boss_modifier
                 .map(|m| m.is_card_debuffed(card))
                 .unwrap_or(false);
@@ -680,6 +804,36 @@ impl Game {
         return Ok(());
     }
 
+    pub(crate) fn sell_joker(&mut self, joker: Jokers) -> Result<(), GameError> {
+        // Can sell during Shop or Blind stages (Luchador needs to sell during Boss Blind)
+        match self.stage {
+            Stage::Shop() | Stage::Blind(_, _) => {},
+            _ => return Err(GameError::InvalidStage),
+        }
+
+        // Find and remove the joker
+        let index = self.jokers.iter().position(|j| j == &joker)
+            .ok_or(GameError::NoJokerMatch)?;
+        let sold_joker = self.jokers.remove(index);
+
+        // Trigger OnSell effects before adding money
+        for effect in &self.effect_registry.on_sell.clone() {
+            if let crate::effect::Effects::OnSell(callback) = effect {
+                let func = callback.lock().unwrap();
+                func(self);
+            }
+        }
+
+        // Add sell value to money
+        self.money += sold_joker.sell_value();
+
+        // Re-register jokers after removal
+        self.effect_registry = crate::effect::EffectRegistry::new();
+        self.effect_registry.register_jokers(self.jokers.clone(), &self.clone());
+
+        return Ok(());
+    }
+
     pub(crate) fn buy_consumable(&mut self, consumable: Consumables) -> Result<(), GameError> {
         use crate::consumable::Consumable;
 
@@ -753,6 +907,9 @@ impl Game {
         let current = self.get_hand_level(rank);
         let upgraded = current.upgrade();
         self.hand_levels.insert(rank, upgraded);
+
+        // Track unique Planet cards used (for Satellite joker)
+        self.unique_planets_used.insert(rank);
     }
 
     /// Helper method for testing - calculates score without side effects
@@ -1265,6 +1422,61 @@ impl Game {
         self.tags.retain(|tag| tag.trigger_type() != TagTrigger::OnBossDefeated);
     }
 
+    /// Trigger OnRoundBegin effects for all jokers
+    fn trigger_round_begin(&mut self) {
+        use crate::effect::Effects;
+        for e in self.effect_registry.on_round_begin.clone() {
+            match e {
+                Effects::OnRoundBegin(f) => f.lock().unwrap()(self),
+                _ => (),
+            }
+        }
+    }
+
+    /// Trigger OnRoundEnd effects for all jokers
+    pub(crate) fn trigger_round_end(&mut self) {
+        use crate::effect::Effects;
+        for e in self.effect_registry.on_round_end.clone() {
+            match e {
+                Effects::OnRoundEnd(f) => f.lock().unwrap()(self),
+                _ => (),
+            }
+        }
+
+        // Check if Gift Card is present
+        let has_gift_card = self.jokers.iter().any(|j| matches!(j, crate::joker::Jokers::GiftCard(_)));
+
+        // Update jokers with special round-end behavior
+        for joker in &mut self.jokers {
+            if let crate::joker::Jokers::Egg(ref mut j) = joker {
+                j.on_round_end();
+            }
+
+            // Gift Card: Add $1 sell value to all jokers with sell_value_bonus field
+            if has_gift_card {
+                if let crate::joker::Jokers::Egg(ref mut j) = joker {
+                    j.sell_value_bonus += 1;
+                }
+                // Add more joker types here as they get sell_value_bonus field
+            }
+        }
+
+        // Re-register effects after state changes
+        self.effect_registry = crate::effect::EffectRegistry::new();
+        self.effect_registry.register_jokers(self.jokers.clone(), &self.clone());
+    }
+
+    /// Trigger OnBlindSelect effects for all jokers
+    fn trigger_blind_select(&mut self) {
+        use crate::effect::Effects;
+        for e in self.effect_registry.on_blind_select.clone() {
+            match e {
+                Effects::OnBlindSelect(f) => f.lock().unwrap()(self),
+                _ => (),
+            }
+        }
+    }
+
     /// Process Boss Tag before encountering boss (re-roll boss blind)
     /// Returns true if boss should be re-rolled
     fn should_reroll_boss(&mut self) -> bool {
@@ -1278,6 +1490,70 @@ impl Game {
             true
         } else {
             false
+        }
+    }
+
+    /// Get additional retrigger count for a card from active jokers
+    fn get_joker_retrigger_bonus(&self, card: &crate::card::Card) -> usize {
+        use crate::card::Value;
+        use crate::joker::Jokers;
+
+        let mut bonus = 0;
+
+        for joker in &self.jokers {
+            match joker {
+                // Hack: Retrigger 2, 3, 4, or 5
+                Jokers::Hack(_) => {
+                    if matches!(card.value, Value::Two | Value::Three | Value::Four | Value::Five) {
+                        bonus += 1;
+                    }
+                }
+                // SockAndBuskin: Retrigger all face cards
+                Jokers::SockAndBuskin(_) => {
+                    if card.is_face() {
+                        bonus += 1;
+                    }
+                }
+                // Seltzer: Retrigger all cards for 10 hands
+                Jokers::Seltzer(seltzer) => {
+                    if seltzer.hands_remaining > 0 {
+                        bonus += 1;
+                    }
+                }
+                // Dusk: Retrigger all cards on final hand
+                Jokers::Dusk(_) => {
+                    if self.plays == 1 {
+                        bonus += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        bonus
+    }
+
+    /// Create a random Tarot card and add it to consumables
+    pub fn create_random_tarot(&mut self) {
+        use crate::consumable::Consumables;
+        use crate::tarot::Tarots;
+        use rand::seq::SliceRandom;
+
+        let all_tarots = Tarots::all();
+        if let Some(tarot) = all_tarots.choose(&mut rand::thread_rng()) {
+            self.consumables.push(Consumables::Tarot(*tarot));
+        }
+    }
+
+    /// Create a random Planet card and add it to consumables
+    pub fn create_random_planet(&mut self) {
+        use crate::consumable::Consumables;
+        use crate::planet::Planets;
+        use rand::seq::SliceRandom;
+
+        let all_planets = Planets::all();
+        if let Some(planet) = all_planets.choose(&mut rand::thread_rng()) {
+            self.consumables.push(Consumables::Planet(*planet));
         }
     }
 
@@ -1463,10 +1739,29 @@ impl Game {
 
         self.stage = Stage::Blind(blind, boss_modifier);
 
+        // Initialize plays and discards for this blind with modifiers applied
+        self.score = self.config.base_score;
+        self.plays = self.config.plays;
+        self.discards = self.config.discards;
+
+        // Apply discard modifiers from jokers
+        if self.modifiers.discard_bonus >= 0 {
+            self.discards += self.modifiers.discard_bonus as usize;
+        } else {
+            self.discards = self.discards.saturating_sub(self.modifiers.discard_bonus.abs() as usize);
+        }
+
+        // Trigger OnBlindSelect effects
+        self.trigger_blind_select();
+
         // Process round start tags (Juggle)
         self.process_round_start_tags();
 
         self.deal();
+
+        // Trigger OnRoundBegin effects
+        self.trigger_round_begin();
+
         return Ok(());
     }
 
@@ -1516,6 +1811,9 @@ impl Game {
                 return Ok(false);
             }
         };
+
+        // Trigger OnRoundEnd effects before finishing blind
+        self.trigger_round_end();
 
         // finish blind, proceed to post blind
         self.stage = Stage::PostBlind();
@@ -1567,6 +1865,10 @@ impl Game {
                 _ => Err(GameError::InvalidAction),
             },
             Action::SelectFromTagPack(index) => self.select_from_tag_pack(index),
+            Action::SellJoker(joker) => match self.stage {
+                Stage::Shop() => self.sell_joker(joker),
+                _ => Err(GameError::InvalidAction),
+            },
         };
     }
 

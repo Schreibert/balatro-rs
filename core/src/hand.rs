@@ -7,7 +7,33 @@ use crate::card::Card;
 use crate::card::Suit;
 use crate::card::Value;
 use crate::error::PlayHandError;
+use crate::game::GameModifiers;
 use crate::rank::HandRank;
+
+/// Context object for hand detection, carrying modifiers and other game state
+pub struct HandContext<'a> {
+    pub modifiers: &'a GameModifiers,
+}
+
+impl<'a> HandContext<'a> {
+    /// Create a default context with no modifiers enabled
+    pub fn default_context() -> HandContext<'static> {
+        static DEFAULT_MODS: GameModifiers = GameModifiers {
+            four_card_straights: false,
+            four_card_flushes: false,
+            all_cards_are_faces: false,
+            smeared_suits: false,
+            gap_straights: false,
+            all_cards_score: false,
+            hand_size_bonus: 0,
+            discard_bonus: 0,
+            min_money: 0,
+        };
+        HandContext {
+            modifiers: &DEFAULT_MODS,
+        }
+    }
+}
 
 // Hand, SelectHand and MadeHand are all representations of a collection of Card,
 // just at different phases in the cycle of selecting, executing and scoring cards.
@@ -120,7 +146,12 @@ impl SelectHand {
     // TwoPair
     // OnePair
     // HighCard
-    pub(crate) fn best_hand(&self) -> Result<MadeHand, PlayHandError> {
+    //
+    // This is the new API that accepts a HandContext for modifier support
+    pub(crate) fn best_hand_with_context(
+        &self,
+        context: &HandContext,
+    ) -> Result<MadeHand, PlayHandError> {
         if self.len() == 0 {
             return Err(PlayHandError::NoCards);
         }
@@ -130,14 +161,14 @@ impl SelectHand {
 
         // We start trying to evaluate best hands first, so we
         // can return best hand right when we find it.
-        if let Some(hand) = self.is_flush_five() {
+        if let Some(hand) = self.is_flush_five(context) {
             return Ok(MadeHand {
                 hand,
                 rank: HandRank::FlushFive,
                 all: self.cards(),
             });
         }
-        if let Some(hand) = self.is_flush_house() {
+        if let Some(hand) = self.is_flush_house(context) {
             return Ok(MadeHand {
                 hand,
                 rank: HandRank::FlushHouse,
@@ -151,14 +182,14 @@ impl SelectHand {
                 all: self.cards(),
             });
         }
-        if let Some(hand) = self.is_royal_flush() {
+        if let Some(hand) = self.is_royal_flush(context) {
             return Ok(MadeHand {
                 hand,
                 rank: HandRank::RoyalFlush,
                 all: self.cards(),
             });
         }
-        if let Some(hand) = self.is_straight_flush() {
+        if let Some(hand) = self.is_straight_flush(context) {
             return Ok(MadeHand {
                 hand,
                 rank: HandRank::StraightFlush,
@@ -179,14 +210,14 @@ impl SelectHand {
                 all: self.cards(),
             });
         }
-        if let Some(hand) = self.is_flush() {
+        if let Some(hand) = self.is_flush(context) {
             return Ok(MadeHand {
                 hand,
                 rank: HandRank::Flush,
                 all: self.cards(),
             });
         }
-        if let Some(hand) = self.is_straight() {
+        if let Some(hand) = self.is_straight(context) {
             return Ok(MadeHand {
                 hand,
                 rank: HandRank::Straight,
@@ -223,6 +254,11 @@ impl SelectHand {
         }
         // We didn't match any known hand, oops...
         return Err(PlayHandError::UnknownHand);
+    }
+
+    /// Backward-compatible wrapper that uses default context
+    pub(crate) fn best_hand(&self) -> Result<MadeHand, PlayHandError> {
+        self.best_hand_with_context(&HandContext::default_context())
     }
 
     pub(crate) fn is_highcard(&self) -> Option<SelectHand> {
@@ -307,46 +343,237 @@ impl SelectHand {
         }
     }
 
-    pub(crate) fn is_straight(&self) -> Option<SelectHand> {
-        if self.len() != 5 {
+    pub(crate) fn is_straight(&self, context: &HandContext) -> Option<SelectHand> {
+        let min_cards = if context.modifiers.four_card_straights {
+            4
+        } else {
+            5
+        };
+
+        if self.len() < min_cards {
             return None;
         }
-        // Iterate our sorted values. Each value must be one more than the previous.
-        let values = self.values();
-        if values.windows(2).all(|v| (v[1] as u16 - v[0] as u16) == 1) {
-            return Some(self.clone());
-        }
 
-        // Special case for low ace.
-        // Values are sorted with Ace as high (2, 3, 4, 5, A)
-        // Therefore, we can check that last value is ace, first value is two.
-        // Then remove the last value (ace) from vec and check for incremental values
-        // for everything else (2, 3, 4, 5).
-        if values[4] == Value::Ace && values[0] == Value::Two {
-            let skip_last: Vec<Value> = values.into_iter().rev().skip(1).rev().collect();
-            if skip_last
-                .windows(2)
-                .all(|v| (v[1] as u16 - v[0] as u16) == 1)
-            {
-                return Some(self.clone());
+        let values = self.values();
+
+        // Check for consecutive sequences of the required length
+        // Try from longest to shortest (5 down to min_cards)
+        for window_size in (min_cards..=self.len().min(5)).rev() {
+            // Check all possible windows of this size
+            for i in 0..=(values.len().saturating_sub(window_size)) {
+                let window = &values[i..i + window_size];
+
+                // Check if this window is consecutive
+                if window.windows(2).all(|v| (v[1] as u16 - v[0] as u16) == 1) {
+                    // Build the straight from these values
+                    let straight_cards: Vec<Card> = window
+                        .iter()
+                        .filter_map(|v| self.0.iter().find(|c| c.value == *v))
+                        .copied()
+                        .collect();
+                    return Some(SelectHand::new(straight_cards));
+                }
+
+                // Check for gap straights (Shortcut joker) - allows one gap in the sequence
+                if context.modifiers.gap_straights {
+                    let mut gap_count = 0;
+                    let mut is_gap_straight = true;
+
+                    for pair in window.windows(2) {
+                        let diff = pair[1] as u16 - pair[0] as u16;
+                        if diff == 1 {
+                            // Consecutive - good
+                            continue;
+                        } else if diff == 2 && gap_count == 0 {
+                            // One gap allowed
+                            gap_count += 1;
+                        } else {
+                            // Too many gaps or gap too large
+                            is_gap_straight = false;
+                            break;
+                        }
+                    }
+
+                    if is_gap_straight && gap_count == 1 {
+                        // Valid gap straight - build the straight from these values
+                        let straight_cards: Vec<Card> = window
+                            .iter()
+                            .filter_map(|v| self.0.iter().find(|c| c.value == *v))
+                            .copied()
+                            .collect();
+                        return Some(SelectHand::new(straight_cards));
+                    }
+                }
             }
         }
-        return None;
+
+        // Special case for low ace straights (A, 2, 3, 4, 5) or (A, 2, 3, 4) with four_card modifier
+        if values.contains(&Value::Ace) && values.contains(&Value::Two) {
+            // Check if we have the required consecutive values starting from 2
+            let needed_values: Vec<Value> = if min_cards == 4 {
+                vec![Value::Two, Value::Three, Value::Four]
+            } else {
+                vec![Value::Two, Value::Three, Value::Four, Value::Five]
+            };
+
+            if needed_values.iter().all(|v| values.contains(v)) {
+                let mut straight_cards: Vec<Card> = needed_values
+                    .iter()
+                    .filter_map(|v| self.0.iter().find(|c| c.value == *v))
+                    .copied()
+                    .collect();
+
+                // Add the ace
+                if let Some(ace) = self.0.iter().find(|c| c.value == Value::Ace) {
+                    straight_cards.push(*ace);
+                }
+
+                return Some(SelectHand::new(straight_cards));
+            }
+
+            // Gap straight with low ace (A, 2, 3, 5) or (A, 2, 4, 5)
+            if context.modifiers.gap_straights {
+                if min_cards == 4 {
+                    // Check for A,2,3,5 (missing 4) or A,2,4,5 (missing 3)
+                    if values.contains(&Value::Five) {
+                        if values.contains(&Value::Three) && !values.contains(&Value::Four) {
+                            // A,2,3,5 gap straight
+                            let gap_values = vec![Value::Two, Value::Three, Value::Five];
+                            let mut straight_cards: Vec<Card> = gap_values
+                                .iter()
+                                .filter_map(|v| self.0.iter().find(|c| c.value == *v))
+                                .copied()
+                                .collect();
+                            if let Some(ace) = self.0.iter().find(|c| c.value == Value::Ace) {
+                                straight_cards.push(*ace);
+                            }
+                            return Some(SelectHand::new(straight_cards));
+                        } else if values.contains(&Value::Four) && !values.contains(&Value::Three) {
+                            // A,2,4,5 gap straight
+                            let gap_values = vec![Value::Two, Value::Four, Value::Five];
+                            let mut straight_cards: Vec<Card> = gap_values
+                                .iter()
+                                .filter_map(|v| self.0.iter().find(|c| c.value == *v))
+                                .copied()
+                                .collect();
+                            if let Some(ace) = self.0.iter().find(|c| c.value == Value::Ace) {
+                                straight_cards.push(*ace);
+                            }
+                            return Some(SelectHand::new(straight_cards));
+                        }
+                    }
+                } else {
+                    // 5-card with gap: A,2,3,4,6 or A,2,3,5,6 or A,2,4,5,6
+                    if values.contains(&Value::Six) {
+                        // Check various gap combinations
+                        let gap_combos = vec![
+                            vec![Value::Two, Value::Three, Value::Four, Value::Six], // Missing 5
+                            vec![Value::Two, Value::Three, Value::Five, Value::Six], // Missing 4
+                            vec![Value::Two, Value::Four, Value::Five, Value::Six],  // Missing 3
+                        ];
+
+                        for combo in gap_combos {
+                            if combo.iter().all(|v| values.contains(v)) {
+                                let mut straight_cards: Vec<Card> = combo
+                                    .iter()
+                                    .filter_map(|v| self.0.iter().find(|c| c.value == *v))
+                                    .copied()
+                                    .collect();
+                                if let Some(ace) = self.0.iter().find(|c| c.value == Value::Ace) {
+                                    straight_cards.push(*ace);
+                                }
+                                return Some(SelectHand::new(straight_cards));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        None
     }
 
-    pub(crate) fn is_flush(&self) -> Option<SelectHand> {
-        if self.len() < 5 {
+    pub(crate) fn is_flush(&self, context: &HandContext) -> Option<SelectHand> {
+        let min_cards = if context.modifiers.four_card_flushes {
+            4
+        } else {
+            5
+        };
+
+        if self.len() < min_cards {
             return None;
         }
-        if let Some((_value, cards)) = self
+
+        // Check normal suit matching
+        if let Some((_suit, cards)) = self
             .suits_freq()
             .into_iter()
-            .find(|(_key, val)| val.len() == 5)
+            .find(|(_key, val)| val.len() >= min_cards)
         {
+            // If 4-card flush, take only the best 4 cards
+            if context.modifiers.four_card_flushes && cards.len() > 4 {
+                let best_4: Vec<Card> = cards
+                    .iter()
+                    .sorted_by_key(|c| c.value)
+                    .rev()
+                    .take(4)
+                    .copied()
+                    .collect();
+                return Some(SelectHand::new(best_4));
+            }
             return Some(SelectHand::new(cards));
-        } else {
-            return None;
         }
+
+        // Check smeared suits (Hearts/Diamonds count as same, Spades/Clubs count as same)
+        if context.modifiers.smeared_suits {
+            // Hearts + Diamonds count as same suit
+            let red_cards: Vec<Card> = self
+                .0
+                .iter()
+                .filter(|c| c.suit == Suit::Heart || c.suit == Suit::Diamond)
+                .copied()
+                .collect();
+
+            if red_cards.len() >= min_cards {
+                let flush_cards: Vec<Card> = if context.modifiers.four_card_flushes && red_cards.len() > 4 {
+                    red_cards
+                        .iter()
+                        .sorted_by_key(|c| c.value)
+                        .rev()
+                        .take(4)
+                        .copied()
+                        .collect()
+                } else {
+                    red_cards.into_iter().take(min_cards).collect()
+                };
+                return Some(SelectHand::new(flush_cards));
+            }
+
+            // Spades + Clubs count as same suit
+            let black_cards: Vec<Card> = self
+                .0
+                .iter()
+                .filter(|c| c.suit == Suit::Spade || c.suit == Suit::Club)
+                .copied()
+                .collect();
+
+            if black_cards.len() >= min_cards {
+                let flush_cards: Vec<Card> = if context.modifiers.four_card_flushes && black_cards.len() > 4 {
+                    black_cards
+                        .iter()
+                        .sorted_by_key(|c| c.value)
+                        .rev()
+                        .take(4)
+                        .copied()
+                        .collect()
+                } else {
+                    black_cards.into_iter().take(min_cards).collect()
+                };
+                return Some(SelectHand::new(flush_cards));
+            }
+        }
+
+        None
     }
 
     pub(crate) fn is_fullhouse(&self) -> Option<SelectHand> {
@@ -401,15 +628,15 @@ impl SelectHand {
         }
     }
 
-    pub(crate) fn is_straight_flush(&self) -> Option<SelectHand> {
-        if self.is_flush().is_some() && self.is_straight().is_some() {
+    pub(crate) fn is_straight_flush(&self, context: &HandContext) -> Option<SelectHand> {
+        if self.is_flush(context).is_some() && self.is_straight(context).is_some() {
             return Some(self.clone());
         }
         return None;
     }
 
-    pub(crate) fn is_royal_flush(&self) -> Option<SelectHand> {
-        if self.is_straight_flush().is_some()
+    pub(crate) fn is_royal_flush(&self, context: &HandContext) -> Option<SelectHand> {
+        if self.is_straight_flush(context).is_some()
             && self.values().into_iter().eq(vec![
                 Value::Ten,
                 Value::Jack,
@@ -438,15 +665,15 @@ impl SelectHand {
         }
     }
 
-    pub(crate) fn is_flush_house(&self) -> Option<SelectHand> {
-        if self.is_flush().is_some() && self.is_fullhouse().is_some() {
+    pub(crate) fn is_flush_house(&self, context: &HandContext) -> Option<SelectHand> {
+        if self.is_flush(context).is_some() && self.is_fullhouse().is_some() {
             return Some(self.clone());
         }
         return None;
     }
 
-    pub(crate) fn is_flush_five(&self) -> Option<SelectHand> {
-        if self.is_flush().is_some() && self.is_five_of_kind().is_some() {
+    pub(crate) fn is_flush_five(&self, context: &HandContext) -> Option<SelectHand> {
+        if self.is_flush(context).is_some() && self.is_five_of_kind().is_some() {
             return Some(self.clone());
         }
         return None;
@@ -474,6 +701,11 @@ impl fmt::Display for SelectHand {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Helper to create default context for tests
+    fn ctx() -> HandContext<'static> {
+        HandContext::default_context()
+    }
 
     #[test]
     fn test_values() {
@@ -796,27 +1028,27 @@ mod tests {
 
         // Valid 5 (2, 3, 4 ,5 ,6)
         let hand = SelectHand::new(vec![c2, c3, c4, c5, c6]);
-        let straight = hand.is_straight();
+        let straight = hand.is_straight(&ctx());
         assert_eq!(straight.unwrap().len(), 5);
 
         // Valid 5 with low ace (A, 2, 3, 4 ,5)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, c5]);
-        let straight = hand.is_straight();
+        let straight = hand.is_straight(&ctx());
         assert_eq!(straight.unwrap().len(), 5);
 
         // Invalid 5 (2, 3, 4, 5, 7)
         let hand = SelectHand::new(vec![c2, c3, c4, c5, c7]);
-        let straight = hand.is_straight();
+        let straight = hand.is_straight(&ctx());
         assert_eq!(straight, None);
 
         // Invalid 5 with low ace (A, 2, 3, 4, 7)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, c7]);
-        let straight = hand.is_straight();
+        let straight = hand.is_straight(&ctx());
         assert_eq!(straight, None);
 
         // Invalid 4 (2, 3, 4, 5)
         let hand = SelectHand::new(vec![c2, c3, c4, c5]);
-        let straight = hand.is_straight();
+        let straight = hand.is_straight(&ctx());
         assert_eq!(straight, None);
     }
 
@@ -831,22 +1063,22 @@ mod tests {
 
         // Valid 5 (h, h, h, h, h)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, c5]);
-        let flush = hand.is_flush();
+        let flush = hand.is_flush(&ctx());
         assert_eq!(flush.unwrap().len(), 5);
 
         // Valid 5 from 7 cards (h, h, h, h, h, d, d)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, c5, not, not]);
-        let flush = hand.is_flush();
+        let flush = hand.is_flush(&ctx());
         assert_eq!(flush.unwrap().len(), 5);
 
         // Invalid 5 (h, h, h, h, d)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, not]);
-        let flush = hand.is_flush();
+        let flush = hand.is_flush(&ctx());
         assert_eq!(flush, None);
 
         // Invalid 4 (h, h, h, h)
         let hand = SelectHand::new(vec![c1, c2, c3, c4]);
-        let flush = hand.is_flush();
+        let flush = hand.is_flush(&ctx());
         assert_eq!(flush, None);
     }
 
@@ -928,27 +1160,27 @@ mod tests {
 
         // Valid 5 (2h, 3h, 4h, 5h ,6h)
         let hand = SelectHand::new(vec![c2, c3, c4, c5, c6]);
-        let sf = hand.is_straight_flush();
+        let sf = hand.is_straight_flush(&ctx());
         assert_eq!(sf.unwrap().len(), 5);
 
         // Valid 5 with low ace (Ah, 2h, 3h, 4h, 5h)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, c5]);
-        let sf = hand.is_straight_flush();
+        let sf = hand.is_straight_flush(&ctx());
         assert_eq!(sf.unwrap().len(), 5);
 
         // Invalid 5, wrong value (2h, 3h, 4h, 5h, 7h)
         let hand = SelectHand::new(vec![c2, c3, c4, c5, not1]);
-        let sf = hand.is_straight_flush();
+        let sf = hand.is_straight_flush(&ctx());
         assert_eq!(sf, None);
 
         // Invalid 5, wrong suit (2h, 3h, 4h, 5h, 6d)
         let hand = SelectHand::new(vec![c2, c3, c4, c5, not2]);
-        let sf = hand.is_straight_flush();
+        let sf = hand.is_straight_flush(&ctx());
         assert_eq!(sf, None);
 
         // Invalid 4 (2h, 3h, 4h, 5h)
         let hand = SelectHand::new(vec![c2, c3, c4, c5]);
-        let sf = hand.is_straight_flush();
+        let sf = hand.is_straight_flush(&ctx());
         assert_eq!(sf, None);
     }
 
@@ -964,27 +1196,27 @@ mod tests {
 
         // Valid 5 (10s, Js, Qs, Ks, As)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, c5]);
-        let rf = hand.is_royal_flush();
+        let rf = hand.is_royal_flush(&ctx());
         assert_eq!(rf.unwrap().len(), 5);
 
         // Valid 5, scrambled input order (Js, 10s, Ks, Qs, As)
         let hand = SelectHand::new(vec![c2, c1, c4, c3, c5]);
-        let rf = hand.is_royal_flush();
+        let rf = hand.is_royal_flush(&ctx());
         assert_eq!(rf.unwrap().len(), 5);
 
         // Invalid 5, wrong value (9s, Js, Qs, Ks, As)
         let hand = SelectHand::new(vec![not1, c2, c3, c4, c5]);
-        let rf = hand.is_royal_flush();
+        let rf = hand.is_royal_flush(&ctx());
         assert_eq!(rf, None);
 
         // Invalid 5, wrong suit (10s, Js, Qs, Ks, Ad)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, not2]);
-        let rf = hand.is_royal_flush();
+        let rf = hand.is_royal_flush(&ctx());
         assert_eq!(rf, None);
 
         // Invalid 4 (2h, 3h, 4h, 5h)
         let hand = SelectHand::new(vec![c2, c3, c4, c5]);
-        let rf = hand.is_royal_flush();
+        let rf = hand.is_royal_flush(&ctx());
         assert_eq!(rf, None);
     }
 
@@ -1030,22 +1262,22 @@ mod tests {
 
         // Valid 5 (Kh, Kh, Kh, Ah, Ah)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, c5]);
-        let fh = hand.is_flush_house();
+        let fh = hand.is_flush_house(&ctx());
         assert_eq!(fh.unwrap().len(), 5);
 
         // Invalid 5 (Kh, Kh, Kh, Ah, 2h)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, not1]);
-        let fh = hand.is_flush_house();
+        let fh = hand.is_flush_house(&ctx());
         assert_eq!(fh, None);
 
         // Invalid 5 (Kh, Kh, Kh, Ah, Ad)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, not2]);
-        let fh = hand.is_flush_house();
+        let fh = hand.is_flush_house(&ctx());
         assert_eq!(fh, None);
 
         // Invalid 4 (Kh, Kh, Kh, Ah)
         let hand = SelectHand::new(vec![c1, c2, c3, c4]);
-        let fh = hand.is_flush_house();
+        let fh = hand.is_flush_house(&ctx());
         assert_eq!(fh, None);
     }
 
@@ -1061,22 +1293,154 @@ mod tests {
 
         // Valid 5 (Kh, Kh, Kh, Kh, Kh)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, c5]);
-        let ff = hand.is_flush_five();
+        let ff = hand.is_flush_five(&ctx());
         assert_eq!(ff.unwrap().len(), 5);
 
         // Invalid 5 (Kh, Kh, Kh, Kh, 2h)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, not1]);
-        let ff = hand.is_flush_five();
+        let ff = hand.is_flush_five(&ctx());
         assert_eq!(ff, None);
 
         // Invalid 5 (Kh, Kh, Kh, Kh, Kd)
         let hand = SelectHand::new(vec![c1, c2, c3, c4, not2]);
-        let ff = hand.is_flush_five();
+        let ff = hand.is_flush_five(&ctx());
         assert_eq!(ff, None);
 
         // Invalid 4 (Kh, Kh, Kh, Kh)
         let hand = SelectHand::new(vec![c1, c2, c3, c4]);
-        let ff = hand.is_flush_five();
+        let ff = hand.is_flush_five(&ctx());
         assert_eq!(ff, None);
+    }
+
+    #[test]
+    fn test_gap_straight_normal() {
+        // Test gap straight with Shortcut joker modifier
+        let c2 = Card::new(Value::Two, Suit::Heart);
+        let c3 = Card::new(Value::Three, Suit::Heart);
+        let c5 = Card::new(Value::Five, Suit::Heart);
+        let c6 = Card::new(Value::Six, Suit::Diamond);
+        let c7 = Card::new(Value::Seven, Suit::Diamond);
+
+        // 2, 3, 5, 6, 7 - missing 4, should be gap straight with modifier
+        let hand = SelectHand::new(vec![c2, c3, c5, c6, c7]);
+
+        // Without modifier - should not be a straight
+        let ctx = HandContext::default_context();
+        let straight = hand.is_straight(&ctx);
+        assert_eq!(straight, None);
+
+        // With gap_straights modifier - should be a straight
+        let mods = GameModifiers {
+            gap_straights: true,
+            ..Default::default()
+        };
+        let ctx = HandContext { modifiers: &mods };
+        let straight = hand.is_straight(&ctx);
+        assert!(straight.is_some());
+        assert_eq!(straight.unwrap().len(), 5);
+    }
+
+    #[test]
+    fn test_gap_straight_ace_low() {
+        // Test gap straight with low ace: A, 2, 3, 5 (missing 4)
+        let ace = Card::new(Value::Ace, Suit::Heart);
+        let c2 = Card::new(Value::Two, Suit::Heart);
+        let c3 = Card::new(Value::Three, Suit::Diamond);
+        let c5 = Card::new(Value::Five, Suit::Club);
+
+        let hand = SelectHand::new(vec![ace, c2, c3, c5]);
+
+        // Without modifier - should not be a straight
+        let ctx = HandContext::default_context();
+        let straight = hand.is_straight(&ctx);
+        assert_eq!(straight, None);
+
+        // With gap_straights and four_card_straights modifiers
+        let mods = GameModifiers {
+            gap_straights: true,
+            four_card_straights: true,
+            ..Default::default()
+        };
+        let ctx = HandContext { modifiers: &mods };
+        let straight = hand.is_straight(&ctx);
+        assert!(straight.is_some());
+        assert_eq!(straight.unwrap().len(), 4);
+    }
+
+    #[test]
+    fn test_gap_straight_multiple_gaps_fails() {
+        // Test that multiple gaps don't work - 2, 3, 6, 7 (missing 4 and 5)
+        let c2 = Card::new(Value::Two, Suit::Heart);
+        let c3 = Card::new(Value::Three, Suit::Heart);
+        let c6 = Card::new(Value::Six, Suit::Diamond);
+        let c7 = Card::new(Value::Seven, Suit::Diamond);
+        let c8 = Card::new(Value::Eight, Suit::Club);
+
+        let hand = SelectHand::new(vec![c2, c3, c6, c7, c8]);
+
+        // Even with gap_straights modifier - should not be a straight (2 gaps)
+        let mods = GameModifiers {
+            gap_straights: true,
+            ..Default::default()
+        };
+        let ctx = HandContext { modifiers: &mods };
+        let straight = hand.is_straight(&ctx);
+        assert_eq!(straight, None);
+    }
+
+    #[test]
+    fn test_four_card_flush_modifier() {
+        // Test 4-card flush with Four Fingers joker
+        let c1 = Card::new(Value::King, Suit::Heart);
+        let c2 = Card::new(Value::Queen, Suit::Heart);
+        let c3 = Card::new(Value::Jack, Suit::Heart);
+        let c4 = Card::new(Value::Seven, Suit::Heart);
+        let not = Card::new(Value::Ace, Suit::Diamond);
+
+        // 4 hearts + 1 diamond
+        let hand = SelectHand::new(vec![c1, c2, c3, c4, not]);
+
+        // Without modifier - should not be a flush
+        let ctx = HandContext::default_context();
+        let flush = hand.is_flush(&ctx);
+        assert_eq!(flush, None);
+
+        // With four_card_flushes modifier - should be a flush
+        let mods = GameModifiers {
+            four_card_flushes: true,
+            ..Default::default()
+        };
+        let ctx = HandContext { modifiers: &mods };
+        let flush = hand.is_flush(&ctx);
+        assert!(flush.is_some());
+        assert_eq!(flush.unwrap().len(), 4);
+    }
+
+    #[test]
+    fn test_smeared_suits_flush() {
+        // Test smeared suits with Smeared Joker
+        let h2 = Card::new(Value::Two, Suit::Heart);
+        let h3 = Card::new(Value::Three, Suit::Heart);
+        let d5 = Card::new(Value::Five, Suit::Diamond);
+        let d7 = Card::new(Value::Seven, Suit::Diamond);
+        let d9 = Card::new(Value::Nine, Suit::Diamond);
+
+        // 2 hearts + 3 diamonds = 5 "red" cards
+        let hand = SelectHand::new(vec![h2, h3, d5, d7, d9]);
+
+        // Without modifier - should not be a flush
+        let ctx = HandContext::default_context();
+        let flush = hand.is_flush(&ctx);
+        assert_eq!(flush, None);
+
+        // With smeared_suits modifier - should be a flush
+        let mods = GameModifiers {
+            smeared_suits: true,
+            ..Default::default()
+        };
+        let ctx = HandContext { modifiers: &mods };
+        let flush = hand.is_flush(&ctx);
+        assert!(flush.is_some());
+        assert_eq!(flush.unwrap().len(), 5);
     }
 }
