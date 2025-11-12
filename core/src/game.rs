@@ -801,6 +801,7 @@ impl Game {
         self.jokers.push(joker);
         self.effect_registry
             .register_jokers(self.jokers.clone(), &self.clone());
+        self.update_modifiers(); // Apply passive joker modifiers
         return Ok(());
     }
 
@@ -830,6 +831,9 @@ impl Game {
         // Re-register jokers after removal
         self.effect_registry = crate::effect::EffectRegistry::new();
         self.effect_registry.register_jokers(self.jokers.clone(), &self.clone());
+
+        // Update modifiers after selling
+        self.update_modifiers();
 
         return Ok(());
     }
