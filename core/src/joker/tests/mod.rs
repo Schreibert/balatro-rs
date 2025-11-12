@@ -3304,3 +3304,91 @@ fn test_luchador() {
     // Verify we got the sell value money
     assert_eq!(g.money, money_before + 3, "Should receive $3 from selling Luchador");
 }
+
+#[test]
+fn test_credit_card() {
+    let mut g = Game::default();
+
+    // Initially, min_money should be 0 (can't go below $0)
+    assert_eq!(g.modifiers.min_money, 0);
+
+    // Buy Credit Card joker
+    g.money += 1000;
+    g.stage = Stage::Shop();
+    let joker = Jokers::CreditCard(CreditCard {});
+    g.shop.jokers.push(joker.clone());
+    g.buy_joker(joker).unwrap();
+
+    // Verify: min_money is now -20
+    assert_eq!(g.modifiers.min_money, -20, "Credit Card should allow going $20 into debt");
+}
+
+#[test]
+fn test_pareidolia() {
+    let mut g = Game::default();
+    g.start();
+    g.stage = Stage::Blind(Blind::Small, None);
+
+    // Create hand with non-face cards (2-6)
+    let two = Card::new(Value::Two, Suit::Heart);
+    let three = Card::new(Value::Three, Suit::Diamond);
+    let four = Card::new(Value::Four, Suit::Club);
+    let five = Card::new(Value::Five, Suit::Spade);
+    let six = Card::new(Value::Six, Suit::Heart);
+    let hand = SelectHand::new(vec![two, three, four, five, six]);
+
+    // Without Pareidolia, this should NOT be a flush (different suits)
+    let score_without = g.calc_score(hand.best_hand().unwrap());
+
+    // Buy Pareidolia joker
+    g.money += 1000;
+    g.stage = Stage::Shop();
+    let joker = Jokers::Pareidolia(Pareidolia {});
+    g.shop.jokers.push(joker.clone());
+    g.buy_joker(joker).unwrap();
+
+    // Verify modifier is set
+    assert!(g.modifiers.all_cards_are_faces, "Pareidolia should set all_cards_are_faces modifier");
+
+    // With Pareidolia, all cards are treated as faces
+    g.stage = Stage::Blind(Blind::Small, None);
+    let score_with = g.calc_score(hand.best_hand().unwrap());
+
+    // Score should be different (faces score higher)
+    assert_ne!(score_without, score_with, "Pareidolia should affect scoring by making all cards faces");
+}
+
+#[test]
+fn test_splash() {
+    let mut g = Game::default();
+    g.start();
+    g.stage = Stage::Blind(Blind::Small, None);
+
+    // Create a pair (only 2 cards score normally)
+    let ace1 = Card::new(Value::Ace, Suit::Heart);
+    let ace2 = Card::new(Value::Ace, Suit::Diamond);
+    let two = Card::new(Value::Two, Suit::Club);
+    let three = Card::new(Value::Three, Suit::Spade);
+    let four = Card::new(Value::Four, Suit::Heart);
+    let hand = SelectHand::new(vec![ace1, ace2, two, three, four]);
+
+    // Without Splash, only the pair scores
+    let score_without = g.calc_score(hand.best_hand().unwrap());
+
+    // Buy Splash joker
+    g.money += 1000;
+    g.stage = Stage::Shop();
+    let joker = Jokers::Splash(Splash {});
+    g.shop.jokers.push(joker.clone());
+    g.buy_joker(joker).unwrap();
+
+    // Verify modifier is set
+    assert!(g.modifiers.all_cards_score, "Splash should set all_cards_score modifier");
+
+    // With Splash, all cards in hand score
+    g.stage = Stage::Blind(Blind::Small, None);
+    let score_with = g.calc_score(hand.best_hand().unwrap());
+
+    // Score should be higher (all 5 cards contribute chips)
+    assert!(score_with > score_without, "Splash should increase score by making all cards score");
+}
