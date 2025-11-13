@@ -29,8 +29,36 @@ impl EffectRegistry {
         };
     }
     pub(crate) fn register_jokers(&mut self, jokers: Vec<Jokers>, game: &Game) {
-        for j in jokers.clone() {
-            for e in j.effects(game) {
+        for (i, j) in jokers.iter().enumerate() {
+            // Handle effect copying jokers specially
+            let effects = match j {
+                // Blueprint: Copy effects from joker to the right
+                Jokers::Blueprint(_) => {
+                    if i + 1 < jokers.len() {
+                        jokers[i + 1].effects(game)
+                    } else {
+                        vec![]
+                    }
+                }
+                // Brainstorm: Copy effects from leftmost joker
+                Jokers::Brainstorm(_) => {
+                    if i > 0 {
+                        // Not the leftmost, copy from index 0
+                        jokers[0].effects(game)
+                    } else if jokers.len() > 1 {
+                        // Brainstorm IS leftmost, copy from second joker
+                        jokers[1].effects(game)
+                    } else {
+                        // Only Brainstorm exists
+                        vec![]
+                    }
+                }
+                // All other jokers: get their own effects
+                _ => j.effects(game),
+            };
+
+            // Register the effects
+            for e in effects {
                 match e {
                     Effects::OnPlay(_) => self.on_play.push(e),
                     Effects::OnDiscard(_) => self.on_discard.push(e),

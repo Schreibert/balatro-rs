@@ -20,7 +20,7 @@
 
 ## Project Overview
 
-balatro-rs is a Rust implementation of Balatro, a poker roguelike deckbuilder game. The project provides a complete game engine with move generation capabilities specifically designed for reinforcement learning applications. The implementation achieves approximately 87% feature parity with the full game.
+balatro-rs is a Rust implementation of Balatro, a poker roguelike deckbuilder game. The project provides a complete game engine with move generation capabilities specifically designed for reinforcement learning applications. The implementation achieves approximately 89% feature parity with the full game.
 
 ### Project Structure
 
@@ -935,14 +935,16 @@ All 20 boss blind modifiers fully implemented:
 - Shop mechanics: Purchase, sell, reroll
 - Dynamic pricing with voucher modifiers
 
-### Jokers: 150 Total (90% Complete)
+### Jokers: 150 Total (93% Complete)
 
-- **Tested (Passing):** 118 jokers (79%) - Fully functional with passing unit tests
+- **Tested (Passing):** 122 jokers (81%) - Fully functional with passing unit tests
 - **Implemented (Not Tested):** 15 jokers (10%) - Fully functional but no test coverage yet
 - **Test Issues:** 2 jokers (1%) - Implemented but tests have logic issues (FacelessJoker, Satellite)
-- **Stubbed:** 15 jokers (10%) - Basic structure only, awaiting system support
+- **Stubbed:** 11 jokers (7%) - Basic structure only, awaiting system support
 
 **Recent Progress:**
+- **Phase 5 Complete**: Implemented effect copying system - Blueprint (copies joker to right) and Brainstorm (copies leftmost joker)
+- **Phase 4 Partial**: Implemented ToTheMoon (earns money based on excess >$20) and Vampire (gains mult from enhanced cards, removes enhancements)
 - **Phase 3 Complete**: Implemented all 5 retrigger jokers (HangingChad, Hack, SockAndBuskin, Dusk, Seltzer)
 - **Phase 2 Complete**: Implemented and tested MidasMask (converts face cards to Gold on score) and MarbleJoker (adds Stone card on blind select)
 - Implemented and tested GoldenTicket (OnPlay effect for Gold enhancement cards earning $3)
@@ -954,9 +956,9 @@ All 20 boss blind modifiers fully implemented:
 **Implemented but Untested (15):**
 Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obelisk, Pareidolia, Ramen, RedCard, RideTheBus, SpaceJoker, Supernova, TheIdol, Throwback
 
-**Stubbed jokers** (15 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include special event hooks, effect copying, card modification mechanics, and complex probability systems. See docs/JOKERS.md for complete list.
+**Stubbed jokers** (11 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include special event hooks (OnPackOpen, OnShopEnd), seal system, death prevention, and shop price modification. See docs/JOKERS.md for complete list.
 
-All 135 functional jokers (118 tested + 15 untested + 2 with test issues) are error-free.
+All 139 functional jokers (122 tested + 15 untested + 2 with test issues) are error-free.
 
 ### Known Issues
 

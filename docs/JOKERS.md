@@ -5,10 +5,10 @@ This document provides a complete reference of ALL 150 jokers in Balatro, includ
 ## Testing & Implementation Status
 
 **Total: 150 Jokers**
-- ✅ **Tested (Passing):** 118 jokers (79%) - Fully functional with unit tests
-- ⚠️ **Implemented (Not Tested):** 16 jokers (11%) - Functional but no test coverage
+- ✅ **Tested (Passing):** 122 jokers (81%) - Fully functional with unit tests
+- ⚠️ **Implemented (Not Tested):** 15 jokers (10%) - Functional but no test coverage
 - 🔧 **Test Issues:** 2 jokers (1%) - Implemented but tests ignored due to test logic issues
-- 📝 **Stubbed:** 15 jokers (10%) - Basic structure only, awaiting system support
+- 📝 **Stubbed:** 11 jokers (7%) - Basic structure only, awaiting system support
 
 **Note:** The project has 1 failing test (`test_double_tag_stacking`) which is a core tag system bug unrelated to any specific joker. See PROJECT_STATUS.md for details.
 
@@ -23,13 +23,13 @@ Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obeli
 - **FacelessJoker** - OnDiscard effect not triggering in test (implementation functional)
 - **Satellite** - Test logic needs adjustment for base rewards (implementation functional)
 
-### Stubbed Jokers Requiring Additional Systems (15)
+### Stubbed Jokers Requiring Additional Systems (11)
 
-**Effect Copying (2):**
-Brainstorm, InvisibleJoker
+**Effect Copying (1):**
+InvisibleJoker
 
-**Special Event Hooks (7):**
-Astronomer, Certificate, Hallucination, MrBones, Perkeo, ToTheMoon, Vampire
+**Special Event Hooks (5):**
+Astronomer, Certificate, Hallucination, MrBones, Perkeo
 
 **Card Modification (2):**
 Mime, RiffRaff
@@ -37,9 +37,9 @@ Mime, RiffRaff
 **Complex/Missing Systems (3):**
 Matador, OopsAll6s, TradingCard
 
-**Total:** 15 unique stubbed jokers (some requirements overlap across categories)
+**Total:** 11 unique stubbed jokers (some requirements overlap across categories)
 
-**Note:** ChaosTheClown has been moved to "Implemented (Not Tested)" as it sets the free_reroll modifier. Phase 2 completed MarbleJoker and MidasMask (card modification). Phase 3 completed all 5 retrigger jokers (HangingChad, Hack, SockAndBuskin, Dusk, Seltzer).
+**Note:** Phase 2 completed MarbleJoker and MidasMask (card modification). Phase 3 completed all 5 retrigger jokers (HangingChad, Hack, SockAndBuskin, Dusk, Seltzer). Phase 4 (partial) completed ToTheMoon and Vampire using existing hooks. Phase 5 completed Blueprint and Brainstorm (effect copying system). Remaining 5 special hook jokers require new infrastructure (OnPackOpen, OnShopEnd, seal system, death prevention).
 
 ## Overview
 
@@ -192,7 +192,7 @@ Balatro uses the formula: `Score = (Base Chips + Card Chips + Bonus Chips) × (B
 | 44 | Sock and Buskin | $6 | Retrigger all played face cards | Start | ✅ |
 | 45 | Hologram | $6 | Gains X0.25 Mult when a playing card added to deck | Start | ✅ |
 | 46 | Matador | $7 | Earn $8 if played hand triggers Boss Blind ability | Start | 📝 |
-| 47 | To the Moon | $5 | Earn $1 per $5 in excess of $20; excess lowers by $5 after round | Start | 📝 |
+| 47 | To the Moon | $5 | Earn $1 per $5 in excess of $20; excess lowers by $5 after round | Start | ✅ |
 | 48 | Card Sharp | $6 | X3 Mult if played poker hand already played this round | Start | ⚠️ |
 | 49 | Madness | $7 | When Small or Big Blind selected, destroy random Joker and create 2 free Jokers | Start | 📝 |
 | 50 | Ramen | $6 | X2 Mult; loses X0.01 Mult per card discarded | Start | ⚠️ |
@@ -208,7 +208,7 @@ Balatro uses the formula: `Score = (Base Chips + Card Chips + Bonus Chips) × (B
 | 60 | Lucky Cat | $5 | Gains X0.25 Mult each time a Lucky card successfully triggers | Start | ✅ |
 | 61 | Cartomancer | $6 | Create Tarot card when Blind selected; requires empty consumable slot | Unlock | ✅ |
 | 62 | Astronomer | $8 | All Planet cards and Celestial Packs in shop are free | Unlock | 📝 |
-| 63 | Vampire | $7 | Gains X0.2 Mult per Enhanced card played; removes enhancement | Unlock | 📝 |
+| 63 | Vampire | $7 | Gains X0.2 Mult per Enhanced card played; removes enhancement | Unlock | ✅ |
 | 64 | Shortcut | $7 | Allows Straights to be made with gaps of 1 rank | Unlock | 📝 |
 
 ---
@@ -227,7 +227,7 @@ Balatro uses the formula: `Score = (Base Chips + Card Chips + Bonus Chips) × (B
 | 8 | Stuntman | $6 | +250 Chips; +3 hand size | Win run | ✅ |
 | 9 | Invisible Joker | $10 | After 2 rounds, sell this to duplicate random Joker | Win run | 📝 |
 | 10 | Blueprint | $10 | Copies ability of Joker to the right | Win run | ✅ |
-| 11 | Brainstorm | $10 | Copies ability of leftmost Joker | Win run | 📝 |
+| 11 | Brainstorm | $10 | Copies ability of leftmost Joker | Win run | ✅ |
 | 12 | Wee Joker | $8 | Gains +8 Chips when each played 2 is scored | Win in 18 or fewer rounds | ✅ |
 | 13 | Hit the Road | $8 | Gains X0.5 Mult for every Jack discarded this round; resets at end of round | Discard 5 Jacks simultaneously | ⚠️ |
 | 14 | The Duo | $8 | X2 Mult if played hand contains a Pair | Win without playing Pair | ✅ |

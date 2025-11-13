@@ -3486,3 +3486,134 @@ fn test_marble_joker() {
         .count();
     assert_eq!(stone_count, 1, "Should have exactly 1 Stone card after blind selection");
 }
+
+#[test]
+fn test_blueprint() {
+    // Blueprint: Copies ability of Joker to the right
+    use crate::card::{Card, Suit, Value};
+
+    let c1 = Card::new(Value::Ace, Suit::Heart);
+    let c2 = Card::new(Value::King, Suit::Diamond);
+
+    // Test WITHOUT Blueprint (just basic Joker)
+    let mut g_without = Game::default();
+    g_without.start();
+    g_without.money += 1000;
+    g_without.stage = Stage::Shop();
+    let basic_joker = Jokers::TheJoker(TheJoker::default());
+    g_without.shop.jokers.push(basic_joker.clone());
+    g_without.buy_joker(basic_joker).unwrap();
+    g_without.stage = Stage::Blind(Blind::Small, None);
+    let score_without_blueprint = g_without.calc_score(SelectHand::new(vec![c1, c2]).best_hand().unwrap());
+
+    // Test WITH Blueprint + basic Joker (Blueprint should copy basic Joker's +4 mult)
+    // Joker order: [Blueprint, TheJoker]
+    let mut g_with = Game::default();
+    g_with.start();
+    g_with.money += 1000;
+    g_with.stage = Stage::Shop();
+    let blueprint = Jokers::Blueprint(Blueprint::default());
+    let basic_joker2 = Jokers::TheJoker(TheJoker::default());
+    g_with.shop.jokers.push(blueprint.clone());
+    g_with.shop.jokers.push(basic_joker2.clone());
+    g_with.buy_joker(blueprint).unwrap();
+    g_with.buy_joker(basic_joker2).unwrap();
+    g_with.stage = Stage::Blind(Blind::Small, None);
+    let score_with_blueprint = g_with.calc_score(SelectHand::new(vec![c1, c2]).best_hand().unwrap());
+
+    // Blueprint copies TheJoker (+4 mult), so total should be +8 mult (4 from Blueprint copy + 4 from TheJoker)
+    // With just one TheJoker: +4 mult
+    // With Blueprint + TheJoker: +8 mult
+    // So the score should be exactly 2x higher (assuming mult is the only difference)
+    assert!(score_with_blueprint > score_without_blueprint,
+        "Blueprint should copy TheJoker effect. Without Blueprint: {}, With Blueprint: {}",
+        score_without_blueprint, score_with_blueprint);
+
+    // Verify that Blueprint does copy when not rightmost
+    // The score with Blueprint + TheJoker should be nearly double just TheJoker
+    // (Blueprint copies TheJoker's +4 mult, so we get +8 mult total)
+    let ratio = score_with_blueprint as f32 / score_without_blueprint as f32;
+    assert!(ratio > 1.5 && ratio < 2.5,
+        "Blueprint should approximately double the effect. Ratio: {:.2}", ratio);
+}
+
+#[test]
+fn test_brainstorm() {
+    // Brainstorm: Copies ability of leftmost Joker
+    use crate::card::{Card, Suit, Value};
+
+    let c1 = Card::new(Value::Ace, Suit::Heart);
+    let c2 = Card::new(Value::King, Suit::Diamond);
+
+    // Test WITHOUT Brainstorm (just basic Joker)
+    let mut g_without = Game::default();
+    g_without.start();
+    g_without.money += 1000;
+    g_without.stage = Stage::Shop();
+    let basic_joker = Jokers::TheJoker(TheJoker::default());
+    g_without.shop.jokers.push(basic_joker.clone());
+    g_without.buy_joker(basic_joker).unwrap();
+    g_without.stage = Stage::Blind(Blind::Small, None);
+    let score_without_brainstorm = g_without.calc_score(SelectHand::new(vec![c1, c2]).best_hand().unwrap());
+
+    // Test WITH Brainstorm + basic Joker (Brainstorm should copy leftmost joker)
+    // Joker order: [TheJoker, Brainstorm]
+    let mut g_with = Game::default();
+    g_with.start();
+    g_with.money += 1000;
+    g_with.stage = Stage::Shop();
+    let basic_joker2 = Jokers::TheJoker(TheJoker::default());
+    let brainstorm = Jokers::Brainstorm(Brainstorm::default());
+    g_with.shop.jokers.push(basic_joker2.clone());
+    g_with.shop.jokers.push(brainstorm.clone());
+    g_with.buy_joker(basic_joker2).unwrap();
+    g_with.buy_joker(brainstorm).unwrap();
+    g_with.stage = Stage::Blind(Blind::Small, None);
+    let score_with_brainstorm = g_with.calc_score(SelectHand::new(vec![c1, c2]).best_hand().unwrap());
+
+    // Brainstorm copies leftmost TheJoker (+4 mult), so total should be +8 mult
+    assert!(score_with_brainstorm > score_without_brainstorm,
+        "Brainstorm should copy leftmost TheJoker effect. Without Brainstorm: {}, With Brainstorm: {}",
+        score_without_brainstorm, score_with_brainstorm);
+
+    // Test Brainstorm as leftmost joker (should copy second joker)
+    let mut g_leftmost = Game::default();
+    g_leftmost.start();
+    g_leftmost.money += 1000;
+    g_leftmost.stage = Stage::Shop();
+    let brainstorm2 = Jokers::Brainstorm(Brainstorm::default());
+    let basic_joker3 = Jokers::TheJoker(TheJoker::default());
+    g_leftmost.shop.jokers.push(brainstorm2.clone());
+    g_leftmost.shop.jokers.push(basic_joker3.clone());
+    g_leftmost.buy_joker(brainstorm2).unwrap();
+    g_leftmost.buy_joker(basic_joker3).unwrap();
+    g_leftmost.stage = Stage::Blind(Blind::Small, None);
+    let score_brainstorm_leftmost = g_leftmost.calc_score(SelectHand::new(vec![c1, c2]).best_hand().unwrap());
+
+    // Brainstorm as leftmost should copy the second joker (TheJoker)
+    // So total should be +8 mult (4 from Brainstorm copy + 4 from TheJoker)
+    assert!(score_brainstorm_leftmost > score_without_brainstorm,
+        "Brainstorm as leftmost should copy second joker. Without Brainstorm: {}, With Brainstorm: {}",
+        score_without_brainstorm, score_brainstorm_leftmost);
+
+    // Test Brainstorm alone (should do nothing)
+    let mut g_alone = Game::default();
+    g_alone.start();
+    g_alone.money += 1000;
+    g_alone.stage = Stage::Shop();
+    let brainstorm3 = Jokers::Brainstorm(Brainstorm::default());
+    g_alone.shop.jokers.push(brainstorm3.clone());
+    g_alone.buy_joker(brainstorm3).unwrap();
+    g_alone.stage = Stage::Blind(Blind::Small, None);
+    let score_brainstorm_alone = g_alone.calc_score(SelectHand::new(vec![c1, c2]).best_hand().unwrap());
+
+    // Brainstorm alone should have no effect (baseline score)
+    let mut g_baseline = Game::default();
+    g_baseline.start();
+    g_baseline.stage = Stage::Blind(Blind::Small, None);
+    let score_baseline = g_baseline.calc_score(SelectHand::new(vec![c1, c2]).best_hand().unwrap());
+
+    assert_eq!(score_brainstorm_alone, score_baseline,
+        "Brainstorm alone should do nothing. Expected: {}, Got: {}",
+        score_baseline, score_brainstorm_alone);
+}

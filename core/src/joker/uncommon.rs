@@ -1784,18 +1784,45 @@ impl Joker for ToTheMoon {
         vec![Categories::Economy]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // Calculate money on score - read live game state
-        fn apply(g: &mut Game, _hand: MadeHand) {
-            let money_earned = if g.money > 20 {
-                let excess = g.money.saturating_sub(20);
-                excess / 5
+        use crate::effect::Effects;
+        use std::sync::{Arc, Mutex};
+
+        // OnScore: Earn money based on excess over $20
+        fn on_score(g: &mut Game, _hand: MadeHand) {
+            let current_excess = if g.money > 20 {
+                g.money.saturating_sub(20)
             } else {
                 0
             };
+
+            // Earn $1 per $5 of excess
+            let money_earned = current_excess / 5;
             g.money += money_earned;
         }
-        vec![Effects::OnScore(Arc::new(Mutex::new(apply)))]
-        // TODO: Need OnRoundEnd effect to decrease excess_money by $5
+
+        // OnRoundEnd: Decrease the internal excess tracker
+        fn on_round_end(g: &mut Game) {
+            // Find this joker and update its state
+            for joker in g.jokers.iter_mut() {
+                if let Jokers::ToTheMoon(ttm) = joker {
+                    // Calculate current excess
+                    let current_excess = if g.money > 20 {
+                        g.money.saturating_sub(20)
+                    } else {
+                        0
+                    };
+
+                    // Update internal excess tracker and decrease by $5
+                    ttm.excess_money = current_excess.saturating_sub(5);
+                    break;
+                }
+            }
+        }
+
+        vec![
+            Effects::OnScore(Arc::new(Mutex::new(on_score))),
+            Effects::OnRoundEnd(Arc::new(Mutex::new(on_round_end)))
+        ]
     }
 }
 
@@ -2079,17 +2106,64 @@ impl Joker for Vampire {
         vec![Categories::MultMult]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
+        use crate::effect::Effects;
+        use std::sync::{Arc, Mutex};
+
         let multiplier = self.bonus_mult;
-        fn apply(g: &mut Game, _hand: MadeHand, mult: f32) {
+
+        // OnScore: Apply X mult multiplier
+        fn on_score(g: &mut Game, _hand: MadeHand, mult: f32) {
             g.mult = (g.mult as f32 * mult) as usize;
         }
-        let apply_closure = move |g: &mut Game, hand: MadeHand| {
-            apply(g, hand, multiplier);
+        let on_score_closure = move |g: &mut Game, hand: MadeHand| {
+            on_score(g, hand, multiplier);
         };
-        vec![Effects::OnScore(Arc::new(Mutex::new(apply_closure)))]
-        // TODO: Need enhancement detection system
-        // TODO: Need enhancement removal system
-        // TODO: Need OnPlay effect to detect enhanced cards and increment bonus_mult
+
+        // OnPlay: Detect enhanced cards, increment bonus, remove enhancements
+        fn on_play(g: &mut Game, hand: MadeHand) {
+            // Get IDs of enhanced cards in the hand
+            let enhanced_card_ids: Vec<usize> = hand.all.iter()
+                .filter(|c| c.enhancement.is_some())
+                .map(|c| c.id)
+                .collect();
+
+            let enhanced_count = enhanced_card_ids.len();
+
+            // Increment Vampire's bonus_mult
+            if enhanced_count > 0 {
+                for joker in g.jokers.iter_mut() {
+                    if let Jokers::Vampire(vampire) = joker {
+                        vampire.bonus_mult += enhanced_count as f32 * 0.2;
+                        break;
+                    }
+                }
+
+                // Remove enhancements from these cards
+                for card_id in enhanced_card_ids {
+                    // Try deck
+                    if g.deck.modify_card(card_id, |c| {
+                        c.enhancement = None;
+                    }) {
+                        continue;
+                    }
+                    // Try available
+                    if g.available.modify_card(card_id, |c| {
+                        c.enhancement = None;
+                    }) {
+                        continue;
+                    }
+                    // Try discarded
+                    if let Some(card) = g.discarded.iter_mut().find(|c| c.id == card_id) {
+                        card.enhancement = None;
+                    }
+                }
+            }
+        }
+
+        vec![
+            Effects::OnScore(Arc::new(Mutex::new(on_score_closure))),
+            Effects::OnPlay(Arc::new(Mutex::new(on_play)))
+        ]
     }
 }
 
