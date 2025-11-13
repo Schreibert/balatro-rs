@@ -1157,8 +1157,29 @@ impl Joker for MarbleJoker {
         vec![Categories::Effect]
     }
     fn effects(&self, _in: &Game) -> Vec<Effects> {
-        // Would need to be handled at blind selection time
-        vec![]
+        use crate::effect::Effects;
+        use std::sync::{Arc, Mutex};
+
+        // OnBlindSelect: Add one Stone card to deck (modify random card to Stone enhancement)
+        fn on_blind_select(g: &mut Game) {
+            use rand::seq::SliceRandom;
+            let mut rng = rand::thread_rng();
+
+            // Get all cards in deck without Stone enhancement
+            let non_stone_cards: Vec<usize> = g.deck.cards().iter()
+                .filter(|c| c.enhancement != Some(crate::card::Enhancement::Stone))
+                .map(|c| c.id)
+                .collect();
+
+            // Pick a random card and convert it to Stone
+            if let Some(&card_id) = non_stone_cards.choose(&mut rng) {
+                g.deck.modify_card(card_id, |c| {
+                    c.enhancement = Some(crate::card::Enhancement::Stone);
+                });
+            }
+        }
+
+        vec![Effects::OnBlindSelect(Arc::new(Mutex::new(on_blind_select)))]
     }
 }
 
@@ -2224,9 +2245,39 @@ impl Joker for MidasMask {
         vec![Categories::Effect]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Need card edition/enhancement modification system
-        // TODO: Need Gold card edition implementation
-        vec![]
+        use crate::effect::Effects;
+        use std::sync::{Arc, Mutex};
+
+        // OnScore: Convert all face cards to Gold enhancement
+        fn on_score(g: &mut Game, hand: MadeHand) {
+            // Get face card IDs from the hand
+            let face_card_ids: Vec<usize> = hand.all.iter()
+                .filter(|c| c.is_face())
+                .map(|c| c.id)
+                .collect();
+
+            // Modify each face card to have Gold enhancement
+            for card_id in face_card_ids {
+                // Try deck first
+                if g.deck.modify_card(card_id, |c| {
+                    c.enhancement = Some(crate::card::Enhancement::Gold);
+                }) {
+                    continue;
+                }
+                // Try available
+                if g.available.modify_card(card_id, |c| {
+                    c.enhancement = Some(crate::card::Enhancement::Gold);
+                }) {
+                    continue;
+                }
+                // Try discarded
+                if let Some(card) = g.discarded.iter_mut().find(|c| c.id == card_id) {
+                    card.enhancement = Some(crate::card::Enhancement::Gold);
+                }
+            }
+        }
+
+        vec![Effects::OnScore(Arc::new(Mutex::new(on_score)))]
     }
 }
 

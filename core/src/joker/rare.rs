@@ -417,10 +417,25 @@ impl Joker for DriverLicense {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::MultMult]
     }
-    fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Need enhancement detection system
-        // TODO: Need to count enhanced cards in full deck
-        vec![]
+    fn effects(&self, game: &Game) -> Vec<Effects> {
+        use crate::effect::Effects;
+        use std::sync::{Arc, Mutex};
+
+        // Count enhanced cards in full deck (deck + available + discarded)
+        let enhanced_count = game.deck.cards().iter()
+            .chain(game.available.cards().iter())
+            .chain(game.discarded.iter())
+            .filter(|c| c.enhancement.is_some())
+            .count();
+
+        if enhanced_count >= 16 {
+            let effect = Effects::OnScore(Arc::new(Mutex::new(|g: &mut Game, _hand: MadeHand| {
+                g.mult *= 3;
+            })));
+            vec![effect]
+        } else {
+            vec![]
+        }
     }
 }
 

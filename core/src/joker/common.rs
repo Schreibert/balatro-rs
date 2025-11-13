@@ -1667,8 +1667,19 @@ impl Joker for GoldenTicket {
     fn categories(&self) -> Vec<Categories> {
         vec![Categories::Economy]
     }
-    fn effects(&self, _in: &Game) -> Vec<Effects> {
-        vec![]
+    fn effects(&self, _game: &Game) -> Vec<Effects> {
+        use crate::effect::Effects;
+        use std::sync::{Arc, Mutex};
+
+        let effect = Effects::OnPlay(Arc::new(Mutex::new(|g: &mut Game, hand: MadeHand| {
+            // Count Gold enhancement cards in played hand
+            let gold_count = hand.all.iter().filter(|c| c.enhancement == Some(crate::card::Enhancement::Gold)).count();
+            if gold_count > 0 {
+                g.money += gold_count * 3;
+            }
+        })));
+
+        vec![effect]
     }
 }
 

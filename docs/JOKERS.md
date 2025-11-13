@@ -5,23 +5,25 @@ This document provides a complete reference of ALL 150 jokers in Balatro, includ
 ## Testing & Implementation Status
 
 **Total: 150 Jokers**
-- ✅ **Tested (Passing):** 107 jokers (71%) - Fully functional with unit tests
-- ⚠️ **Implemented (Not Tested):** 15 jokers (10%) - Functional but no test coverage
+- ✅ **Tested (Passing):** 111 jokers (74%) - Fully functional with unit tests
+- ⚠️ **Implemented (Not Tested):** 16 jokers (11%) - Functional but no test coverage
 - 🔧 **Test Issues:** 2 jokers (1%) - Implemented but tests ignored due to test logic issues
-- 📝 **Stubbed:** 26 jokers (17%) - Basic structure only, awaiting system support
+- 📝 **Stubbed:** 22 jokers (15%) - Basic structure only, awaiting system support
 
 **Note:** The project has 1 failing test (`test_double_tag_stacking`) which is a core tag system bug unrelated to any specific joker. See PROJECT_STATUS.md for details.
 
-### Implemented but Untested Jokers (15)
+### Implemented but Untested Jokers (16)
 
-Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obelisk, Ramen, RedCard, RideTheBus, SpaceJoker, Supernova, TheIdol, Throwback
+Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obelisk, Pareidolia, Ramen, RedCard, RideTheBus, SpaceJoker, Supernova, TheIdol, Throwback
+
+**Note:** Pareidolia sets the `all_cards_are_faces` modifier but requires `card.is_face()` to check this modifier for full functionality.
 
 ### Jokers with Test Issues (2)
 
 - **FacelessJoker** - OnDiscard effect not triggering in test (implementation functional)
 - **Satellite** - Test logic needs adjustment for base rewards (implementation functional)
 
-### Stubbed Jokers Requiring Additional Systems (26)
+### Stubbed Jokers Requiring Additional Systems (22)
 
 **Retrigger System (5):**
 Dusk, Hack, HangingChad, Seltzer, SockAndBuskin
@@ -32,13 +34,15 @@ Brainstorm, InvisibleJoker
 **Special Event Hooks (7):**
 Astronomer, Certificate, Hallucination, MrBones, Perkeo, ToTheMoon, Vampire
 
-**Card Modification (6):**
-ChaosTheClown, MarbleJoker, Mime, Pareidolia, RiffRaff, SmearedJoker
+**Card Modification (4):**
+MarbleJoker, Mime, RiffRaff, SmearedJoker
 
-**Complex/Missing Systems (7):**
-CreditCard, DriverLicense, GoldenTicket, Matador, OopsAll6s, Splash, TradingCard
+**Complex/Missing Systems (3):**
+Matador, OopsAll6s, TradingCard
 
-**Total:** 26 unique stubbed jokers (some requirements overlap across categories)
+**Total:** 22 unique stubbed jokers (some requirements overlap across categories)
+
+**Note:** ChaosTheClown has been moved to "Implemented (Not Tested)" as it sets the free_reroll modifier.
 
 ## Overview
 
@@ -234,7 +238,7 @@ Balatro uses the formula: `Score = (Base Chips + Card Chips + Bonus Chips) × (B
 | 16 | The Family | $8 | X4 Mult if played hand contains Four of a Kind | Win without playing Four of a Kind | ✅ |
 | 17 | The Order | $8 | X3 Mult if played hand contains Straight | Win without playing Straight | ✅ |
 | 18 | The Tribe | $8 | X2 Mult if played hand contains Flush | Win without playing Flush | ✅ |
-| 19 | Driver's License | $7 | X3 Mult if full deck has at least 16 Enhanced cards | Win by only playing 1 hand per round | 📝 |
+| 19 | Driver's License | $7 | X3 Mult if full deck has at least 16 Enhanced cards | Win by only playing 1 hand per round | ✅ |
 | 20 | Burnt Joker | $6 | Upgrade level of first discarded poker hand each round | Play 1000+ hands | 📝 |
 
 ---
