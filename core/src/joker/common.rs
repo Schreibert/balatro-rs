@@ -1640,7 +1640,29 @@ impl Joker for RiffRaff {
         vec![Categories::Effect]
     }
     fn effects(&self, _in: &Game) -> Vec<Effects> {
-        vec![]
+        use crate::effect::Effects;
+        use std::sync::{Arc, Mutex};
+
+        fn on_blind_select(g: &mut Game) {
+            use rand::seq::SliceRandom;
+
+            // Determine how many jokers we can add
+            let slots_available = g.max_joker_slots().saturating_sub(g.jokers.len());
+            let to_create = slots_available.min(2);
+
+            // Generate 2 common jokers
+            for _ in 0..to_create {
+                let all_common = crate::joker::Jokers::all_common();
+                let joker = all_common.choose(&mut rand::thread_rng()).unwrap().clone();
+                g.jokers.push(joker);
+            }
+
+            // Re-register joker effects after adding new ones
+            g.effect_registry = crate::effect::EffectRegistry::new();
+            g.effect_registry.register_jokers(g.jokers.clone(), &g.clone());
+        }
+
+        vec![Effects::OnBlindSelect(Arc::new(Mutex::new(on_blind_select)))]
     }
 }
 

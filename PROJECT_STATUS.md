@@ -20,7 +20,7 @@
 
 ## Project Overview
 
-balatro-rs is a Rust implementation of Balatro, a poker roguelike deckbuilder game. The project provides a complete game engine with move generation capabilities specifically designed for reinforcement learning applications. The implementation achieves approximately 89% feature parity with the full game.
+balatro-rs is a Rust implementation of Balatro, a poker roguelike deckbuilder game. The project provides a complete game engine with move generation capabilities specifically designed for reinforcement learning applications. The implementation achieves approximately 90% feature parity with the full game.
 
 ### Project Structure
 
@@ -935,14 +935,16 @@ All 20 boss blind modifiers fully implemented:
 - Shop mechanics: Purchase, sell, reroll
 - Dynamic pricing with voucher modifiers
 
-### Jokers: 150 Total (93% Complete)
+### Jokers: 150 Total (94.7% Complete)
 
-- **Tested (Passing):** 122 jokers (81%) - Fully functional with passing unit tests
+- **Tested (Passing):** 124 jokers (82.7%) - Fully functional with passing unit tests
 - **Implemented (Not Tested):** 15 jokers (10%) - Fully functional but no test coverage yet
-- **Test Issues:** 2 jokers (1%) - Implemented but tests have logic issues (FacelessJoker, Satellite)
-- **Stubbed:** 11 jokers (7%) - Basic structure only, awaiting system support
+- **Test Issues:** 3 jokers (2%) - Implemented but tests have issues (FacelessJoker, Satellite, InvisibleJoker)
+- **Stubbed:** 8 jokers (5.3%) - Basic structure only, awaiting system support
 
 **Recent Progress:**
+- **Phase 7 Complete**: Implemented Certificate (adds random card with random seal on round begin using existing OnRoundBegin hook)
+- **Phase 6 Partial**: Implemented RiffRaff (creates 2 common jokers on blind select) and InvisibleJoker (OnRoundEnd tracker - OnSell duplication has limitations)
 - **Phase 5 Complete**: Implemented effect copying system - Blueprint (copies joker to right) and Brainstorm (copies leftmost joker)
 - **Phase 4 Partial**: Implemented ToTheMoon (earns money based on excess >$20) and Vampire (gains mult from enhanced cards, removes enhancements)
 - **Phase 3 Complete**: Implemented all 5 retrigger jokers (HangingChad, Hack, SockAndBuskin, Dusk, Seltzer)
@@ -956,9 +958,9 @@ All 20 boss blind modifiers fully implemented:
 **Implemented but Untested (15):**
 Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obelisk, Pareidolia, Ramen, RedCard, RideTheBus, SpaceJoker, Supernova, TheIdol, Throwback
 
-**Stubbed jokers** (11 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include special event hooks (OnPackOpen, OnShopEnd), seal system, death prevention, and shop price modification. See docs/JOKERS.md for complete list.
+**Stubbed jokers** (8 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include special event hooks (OnPackOpen, OnShopEnd), discard tracking, death prevention, and boss blind detection. See docs/JOKERS.md for complete list.
 
-All 139 functional jokers (122 tested + 15 untested + 2 with test issues) are error-free.
+All 142 functional jokers (124 tested + 15 untested + 3 with test issues) are error-free.
 
 ### Known Issues
 

@@ -1720,10 +1720,26 @@ impl Joker for TradingCard {
         vec![Categories::Economy]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Need OnDiscard effect that checks if it's the first discard of the blind
-        // TODO: Need to track discards_this_blind counter (reset on blind start)
-        // TODO: Need card destruction system
-        vec![]
+        use crate::effect::Effects;
+        use std::sync::{Arc, Mutex};
+
+        fn on_discard(g: &mut Game, hand: crate::hand::MadeHand) {
+            // Check if this is the first discard of the blind and exactly 1 card was discarded
+            // Use hand.all which contains ALL selected cards, not just the ones used in best hand
+            if g.discards_this_blind == 1 && hand.all.len() == 1 {
+                // Get the discarded card
+                let card = hand.all[0];
+
+                // Remove from discarded pile and add to destroyed pile
+                if let Some(pos) = g.discarded.iter().rposition(|c| c == &card) {
+                    g.discarded.remove(pos);
+                    g.destroyed.push(card);
+                    g.money += 3;
+                }
+            }
+        }
+
+        vec![Effects::OnDiscard(Arc::new(Mutex::new(on_discard)))]
     }
 }
 
@@ -2410,10 +2426,34 @@ impl Joker for Certificate {
         vec![Categories::Effect]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Need OnRoundBegin effect type
-        // TODO: Need seal system (Red, Blue, Purple, Gold seals)
-        // TODO: Need card generation and hand insertion system
-        vec![]
+        use crate::effect::Effects;
+        use std::sync::{Arc, Mutex};
+
+        fn on_round_begin(g: &mut Game) {
+            use crate::card::{Card, Seal, Suit, Value};
+            use rand::seq::SliceRandom;
+
+            // Generate a random playing card
+            let all_values = [
+                Value::Ace, Value::Two, Value::Three, Value::Four, Value::Five,
+                Value::Six, Value::Seven, Value::Eight, Value::Nine, Value::Ten,
+                Value::Jack, Value::Queen, Value::King
+            ];
+            let all_suits = [Suit::Heart, Suit::Diamond, Suit::Club, Suit::Spade];
+            let all_seals = [Seal::Gold, Seal::Red, Seal::Blue, Seal::Purple];
+
+            let value = all_values.choose(&mut rand::thread_rng()).unwrap();
+            let suit = all_suits.choose(&mut rand::thread_rng()).unwrap();
+            let seal = all_seals.choose(&mut rand::thread_rng()).unwrap();
+
+            let mut card = Card::new(*value, *suit);
+            card.seal = Some(*seal);
+
+            // Add the card to the player's hand
+            g.hand.push(card);
+        }
+
+        vec![Effects::OnRoundBegin(Arc::new(Mutex::new(on_round_begin)))]
     }
 }
 

@@ -2104,27 +2104,6 @@ fn test_turtle_bean() {
     }
 }
 
-#[test]
-#[ignore = "Needs OnDiscard hook and card destruction"]
-fn test_trading_card() {
-    // Trading Card: If first discard contains 1 card, destroy it and earn $3
-    use crate::card::{Card, Suit, Value};
-
-    let mut g = Game::default();
-    g.start();
-
-    g.money += 1000;
-    let initial_money = g.money;
-    g.stage = Stage::Shop();
-    let joker = Jokers::TradingCard(TradingCard::default());
-    g.shop.jokers.push(joker.clone());
-    g.buy_joker(joker).unwrap();
-    g.stage = Stage::Blind(Blind::Small, None);
-
-    // TODO: Discard a single card as first discard
-    // TODO: Verify card is destroyed and $3 is earned
-    // assert!(g.money > initial_money + 3, "Should earn $3 from first single-card discard");
-}
 
 #[test]
 #[ignore = "Needs boss blind trigger detection"]
@@ -2529,22 +2508,49 @@ fn test_driver_license() {
 }
 
 #[test]
-#[ignore = "Needs OnRoundBegin hook and seal system"]
 fn test_certificate() {
     // Certificate: When round begins, add random playing card with random seal to hand
+    use crate::card::Seal;
+
     let mut g = Game::default();
     g.start();
 
-    g.money += 1000;
+    // Setup: Buy Certificate joker
+    g.money = 1000;
     g.stage = Stage::Shop();
-    let joker = Jokers::Certificate(Certificate::default());
-    g.shop.jokers.push(joker.clone());
-    g.buy_joker(joker).unwrap();
+    let certificate = Jokers::Certificate(Certificate::default());
+    g.shop.jokers.push(certificate.clone());
+    g.buy_joker(certificate).unwrap();
 
+    // Record initial hand size
     let initial_hand_size = g.hand.len();
-    // TODO: Trigger round begin
-    // TODO: Verify hand has one more card with a seal
-    // assert_eq!(g.hand.len(), initial_hand_size + 1);
+
+    // Manually trigger OnRoundBegin effects to simulate round start
+    for effect in &g.effect_registry.on_round_begin.clone() {
+        if let crate::effect::Effects::OnRoundBegin(callback) = effect {
+            let func = callback.lock().unwrap();
+            func(&mut g);
+        }
+    }
+
+    // Verify that a card was added to hand
+    let new_hand_size = g.hand.len();
+    assert_eq!(new_hand_size, initial_hand_size + 1,
+        "Certificate should add 1 card to hand. Before: {}, After: {}",
+        initial_hand_size, new_hand_size);
+
+    // Verify the new card has a seal
+    let last_card = g.hand.last().expect("Hand should have at least one card");
+    assert!(last_card.seal.is_some(),
+        "Certificate should add a card with a seal. Card: {:?}", last_card);
+
+    // Verify it's one of the 4 valid seals
+    match last_card.seal {
+        Some(Seal::Gold) | Some(Seal::Red) | Some(Seal::Blue) | Some(Seal::Purple) => {
+            // Valid seal - test passes
+        }
+        _ => panic!("Certificate added card with invalid seal: {:?}", last_card.seal),
+    }
 }
 
 #[test]
@@ -3616,4 +3622,212 @@ fn test_brainstorm() {
     assert_eq!(score_brainstorm_alone, score_baseline,
         "Brainstorm alone should do nothing. Expected: {}, Got: {}",
         score_baseline, score_brainstorm_alone);
+}
+
+#[test]
+fn test_riff_raff() {
+    // Riff-Raff: When Blind selected, create 2 Common Jokers
+    let mut g = Game::default();
+    g.start();
+
+    // Setup: buy RiffRaff in shop
+    g.money = 1000;
+    g.stage = Stage::Shop();
+    let riff_raff = Jokers::RiffRaff(RiffRaff::default());
+    g.shop.jokers.push(riff_raff.clone());
+    g.buy_joker(riff_raff).unwrap();
+
+    // Verify RiffRaff is in jokers list
+    let initial_joker_count = g.jokers.len();
+    assert_eq!(initial_joker_count, 1, "Should have 1 joker (RiffRaff)");
+
+    // Move to PreBlind stage
+    g.stage = Stage::PreBlind();
+
+    // Select a blind (this should trigger OnBlindSelect and create 2 common jokers)
+    let result = g.handle_action(Action::SelectBlind(Blind::Small));
+    assert!(result.is_ok(), "SelectBlind action should succeed");
+
+    // Check that 2 more jokers were added (if space available)
+    let max_slots = g.max_joker_slots();
+    let expected_jokers = if max_slots >= 3 {
+        3  // RiffRaff + 2 new common jokers
+    } else {
+        max_slots  // Limited by max slots
+    };
+
+    assert_eq!(g.jokers.len(), expected_jokers,
+        "Should have {} jokers after blind selection (RiffRaff + 2 created). Max slots: {}",
+        expected_jokers, max_slots);
+
+    // Verify that the new jokers are common rarity
+    let common_jokers_count = g.jokers.iter()
+        .filter(|j| j.rarity() == Rarity::Common)
+        .count();
+    assert!(common_jokers_count >= 2,
+        "Should have at least 2 common jokers (RiffRaff is common, plus 2 created)");
+}
+
+#[test]
+fn test_invisible_joker() {
+    // InvisibleJoker: After rounds_remaining reaches 0, sell duplicates random Joker
+    let mut g = Game::default();
+    g.start();
+
+    // Setup: Add InvisibleJoker (with 0 rounds remaining) and TheJoker
+    g.money = 1000;
+    g.stage = Stage::Shop();
+    let invisible = Jokers::InvisibleJoker(InvisibleJoker { rounds_remaining: 0 });
+    let basic_joker = Jokers::TheJoker(TheJoker::default());
+    g.shop.jokers.push(invisible.clone());
+    g.shop.jokers.push(basic_joker.clone());
+    g.buy_joker(invisible.clone()).unwrap();
+    g.buy_joker(basic_joker).unwrap();
+
+    // Verify initial state
+    assert_eq!(g.jokers.len(), 2, "Should have 2 jokers");
+
+    // Verify rounds_remaining is 0
+    let rounds = if let Jokers::InvisibleJoker(ref ij) = g.jokers[0] {
+        ij.rounds_remaining
+    } else {
+        panic!("First joker should be InvisibleJoker");
+    };
+    assert_eq!(rounds, 0, "Should have 0 rounds remaining");
+
+    // Now sell InvisibleJoker - it should duplicate TheJoker since rounds_remaining == 0
+    let jokers_before_sell = g.jokers.len();
+    assert_eq!(jokers_before_sell, 2, "Should have 2 jokers before sell");
+
+    g.sell_joker(invisible).unwrap();
+
+    // After selling, check if TheJoker was duplicated
+    let jokers_after_sell = g.jokers.len();
+
+    // Should have: -1 (sold InvisibleJoker) +1 (duplicated TheJoker) = same count
+    // But only if there's space
+    let max_slots = g.max_joker_slots();
+    if max_slots > jokers_before_sell - 1 {
+        // There was space to add the duplicate
+        assert_eq!(jokers_after_sell, jokers_before_sell,
+            "Should have same number of jokers (sold 1, added 1 duplicate). Before: {}, After: {}, Max slots: {}",
+            jokers_before_sell, jokers_after_sell, max_slots);
+
+        // Verify that we now have 2 TheJoker instances
+        let the_joker_count = g.jokers.iter()
+            .filter(|j| matches!(j, Jokers::TheJoker(_)))
+            .count();
+        assert_eq!(the_joker_count, 2,
+            "Should have 2 TheJokers after selling InvisibleJoker (1 original + 1 duplicate). Got: {}",
+            the_joker_count);
+    } else {
+        // No space, so just 1 joker remaining
+        assert_eq!(jokers_after_sell, jokers_before_sell - 1,
+            "Should have 1 fewer joker (no space for duplicate)");
+    }
+}
+
+#[test]
+fn test_trading_card() {
+    let mut g = Game::default();
+    g.start();
+    g.stage = Stage::Blind(Blind::Small, None);
+
+    let initial_money = 100;
+    g.money = initial_money;
+
+    // Add TradingCard joker
+    let trading_card = Jokers::TradingCard(TradingCard::default());
+    g.jokers.push(trading_card.clone());
+
+    // Re-register effects
+    g.effect_registry = crate::effect::EffectRegistry::new();
+    g.effect_registry.register_jokers(g.jokers.clone(), &g.clone());
+
+    // Verify we start with 0 discards this blind
+    assert_eq!(g.discards_this_blind, 0, "Should start with 0 discards this blind");
+
+    // Test 1: First discard with exactly 1 card should destroy and earn $3
+    let card_to_discard = g.available.cards()[0];
+    g.select_card(card_to_discard).unwrap();
+
+    let destroyed_before = g.destroyed.len();
+    g.handle_action(Action::Discard()).unwrap();
+
+    // Manually trigger OnDiscard effects
+    let discarded_hand = crate::hand::SelectHand::new(vec![card_to_discard]).best_hand().unwrap();
+    let effects_clone = g.effect_registry.on_discard.clone();
+    for effect in &effects_clone {
+        if let Effects::OnDiscard(f) = effect {
+            f.lock().unwrap()(&mut g, discarded_hand.clone());
+        }
+    }
+
+    assert_eq!(g.discards_this_blind, 1, "Should have 1 discard this blind");
+    assert_eq!(g.destroyed.len(), destroyed_before + 1,
+        "Card should be destroyed. Before: {}, After: {}", destroyed_before, g.destroyed.len());
+    assert_eq!(g.money, initial_money + 3,
+        "Should earn $3. Expected: {}, Got: {}", initial_money + 3, g.money);
+    assert!(g.destroyed.contains(&card_to_discard),
+        "Destroyed card should be the one we discarded");
+
+    // Test 2: Second discard should not trigger (not first discard anymore)
+    let money_before_second = g.money;
+    let destroyed_before_second = g.destroyed.len();
+
+    let card_to_discard_2 = g.available.cards()[0];
+    g.select_card(card_to_discard_2).unwrap();
+    g.handle_action(Action::Discard()).unwrap();
+
+    // Manually trigger OnDiscard effects
+    let discarded_hand_2 = crate::hand::SelectHand::new(vec![card_to_discard_2]).best_hand().unwrap();
+    let effects_clone = g.effect_registry.on_discard.clone();
+    for effect in &effects_clone {
+        if let Effects::OnDiscard(f) = effect {
+            f.lock().unwrap()(&mut g, discarded_hand_2.clone());
+        }
+    }
+
+    assert_eq!(g.discards_this_blind, 2, "Should have 2 discards this blind");
+    assert_eq!(g.destroyed.len(), destroyed_before_second,
+        "No card should be destroyed on second discard");
+    assert_eq!(g.money, money_before_second,
+        "Should not earn money on second discard");
+
+    // Test 3: First discard with 2+ cards should not trigger
+    // Reset for new blind by creating new game state
+    let mut g2 = Game::default();
+    g2.start();
+    g2.stage = Stage::Blind(Blind::Big, None);
+    g2.money = initial_money;
+
+    // Add TradingCard joker again
+    g2.jokers.push(trading_card);
+    g2.effect_registry = crate::effect::EffectRegistry::new();
+    g2.effect_registry.register_jokers(g2.jokers.clone(), &g2.clone());
+
+    let money_before_multi = g2.money;
+    let destroyed_before_multi = g2.destroyed.len();
+
+    // Select 2 cards
+    let cards = g2.available.cards()[0..2].to_vec();
+    for card in &cards {
+        g2.select_card(*card).unwrap();
+    }
+    g2.handle_action(Action::Discard()).unwrap();
+
+    // Manually trigger OnDiscard effects
+    let discarded_hand_multi = crate::hand::SelectHand::new(cards.clone()).best_hand().unwrap();
+    let effects_clone = g2.effect_registry.on_discard.clone();
+    for effect in &effects_clone {
+        if let Effects::OnDiscard(f) = effect {
+            f.lock().unwrap()(&mut g2, discarded_hand_multi.clone());
+        }
+    }
+
+    assert_eq!(g2.discards_this_blind, 1, "Should be first discard of new blind");
+    assert_eq!(g2.destroyed.len(), destroyed_before_multi,
+        "No cards should be destroyed when discarding multiple");
+    assert_eq!(g2.money, money_before_multi,
+        "Should not earn money when discarding multiple cards");
 }

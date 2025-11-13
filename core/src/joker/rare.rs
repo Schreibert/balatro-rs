@@ -494,10 +494,60 @@ impl Joker for InvisibleJoker {
         vec![Categories::Effect]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Need OnRoundEnd effect to decrement rounds_remaining
-        // TODO: Need OnSell effect to duplicate random joker
-        // TODO: Need joker duplication system
-        vec![]
+        use crate::effect::Effects;
+        use std::sync::{Arc, Mutex};
+
+        // OnRoundEnd: Decrement rounds_remaining
+        fn on_round_end(g: &mut Game) {
+            for joker in g.jokers.iter_mut() {
+                if let Jokers::InvisibleJoker(ref mut ij) = joker {
+                    ij.rounds_remaining = ij.rounds_remaining.saturating_sub(1);
+                    break;
+                }
+            }
+        }
+
+        // OnSell: If rounds_remaining == 0, duplicate a random other joker
+        fn on_sell(g: &mut Game) {
+            // Check if InvisibleJoker being sold has rounds_remaining == 0
+            // Find InvisibleJoker in jokers list
+            let mut should_duplicate = false;
+            for joker in g.jokers.iter() {
+                if let Jokers::InvisibleJoker(ref ij) = joker {
+                    if ij.rounds_remaining == 0 {
+                        should_duplicate = true;
+                    }
+                    break;
+                }
+            }
+
+            if should_duplicate && g.jokers.len() > 1 {
+                // Get all jokers except InvisibleJoker itself
+                use rand::seq::SliceRandom;
+                let other_jokers: Vec<Jokers> = g.jokers.iter()
+                    .filter(|j| !matches!(j, Jokers::InvisibleJoker(_)))
+                    .cloned()
+                    .collect();
+
+                if !other_jokers.is_empty() {
+                    // Pick a random joker to duplicate
+                    let to_duplicate = other_jokers.choose(&mut rand::thread_rng()).unwrap().clone();
+
+                    // Add it if there's space
+                    if g.jokers.len() < g.max_joker_slots() {
+                        g.jokers.push(to_duplicate);
+                        // Re-register joker effects
+                        g.effect_registry = crate::effect::EffectRegistry::new();
+                        g.effect_registry.register_jokers(g.jokers.clone(), &g.clone());
+                    }
+                }
+            }
+        }
+
+        vec![
+            Effects::OnRoundEnd(Arc::new(Mutex::new(on_round_end))),
+            Effects::OnSell(Arc::new(Mutex::new(on_sell)))
+        ]
     }
 }
 

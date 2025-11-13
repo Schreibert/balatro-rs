@@ -106,6 +106,9 @@ pub struct Game {
     // Phase 4D: Category D Boss Modifier State
     pub first_deal_this_blind: bool, // For The House - first hand dealt with 1 card
 
+    // Phase 8: Discard tracking for jokers
+    pub discards_this_blind: usize, // Track discards during current blind (for TradingCard)
+
     // Phase 7: Skip Blind & Tag System
     pub tags: Vec<Tag>,                      // Tag queue (FIFO ordering)
     pub pending_skip_tag: Option<Tag>,       // Tag to be received if skip blind is chosen
@@ -201,6 +204,7 @@ impl Game {
             allowed_hand_rank: None,
             hands_played_this_blind: 0,
             first_deal_this_blind: true,
+            discards_this_blind: 0,
             tags: Vec::new(),
             pending_skip_tag: None,
             hands_played_count: 0,
@@ -253,6 +257,7 @@ impl Game {
         self.played_hand_ranks.clear();
         self.allowed_hand_rank = None;
         self.hands_played_this_blind = 0;
+        self.discards_this_blind = 0; // Reset discard tracking for current blind
         self.deal();
         // Reset Category D state - prepare for next blind
         self.first_deal_this_blind = true;
@@ -554,6 +559,7 @@ impl Game {
         }
         self.discards -= 1;
         self.discards_used += 1; // Track for Garbage Tag
+        self.discards_this_blind += 1; // Track discards this blind for TradingCard
         let selected_cards = self.available.selected();
         self.discarded.extend(selected_cards.clone());
 
