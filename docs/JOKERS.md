@@ -5,10 +5,10 @@ This document provides a complete reference of ALL 150 jokers in Balatro, includ
 ## Testing & Implementation Status
 
 **Total: 150 Jokers**
-- ✅ **Tested (Passing):** 124 jokers (82.7%) - Fully functional with unit tests
+- ✅ **Tested (Passing):** 126 jokers (84%) - Fully functional with unit tests
 - ⚠️ **Implemented (Not Tested):** 15 jokers (10%) - Functional but no test coverage
-- 🔧 **Test Issues:** 3 jokers (2%) - Implemented but tests have issues (test logic or partial implementation)
-- 📝 **Stubbed:** 8 jokers (5.3%) - Basic structure only, awaiting system support
+- 🔧 **Test Issues:** 4 jokers (2.7%) - Implemented but tests have issues (test logic or partial implementation)
+- 📝 **Stubbed:** 5 jokers (3.3%) - Basic structure only, awaiting system support
 
 **Note:** The project has 1 failing test (`test_double_tag_stacking`) which is a core tag system bug unrelated to any specific joker. See PROJECT_STATUS.md for details.
 
@@ -18,26 +18,27 @@ Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obeli
 
 **Note:** Pareidolia sets the `all_cards_are_faces` modifier but requires `card.is_face()` to check this modifier for full functionality.
 
-### Jokers with Test Issues (3)
+### Jokers with Test Issues (4)
 
 - **FacelessJoker** - OnDiscard effect not triggering in test (implementation functional)
 - **Satellite** - Test logic needs adjustment for base rewards (implementation functional)
 - **InvisibleJoker** - OnRoundEnd works, but OnSell duplication has effect system limitations
+- **OopsAll6s** - Partial implementation (joker rarity only); full probability system requires comprehensive infrastructure
 
-### Stubbed Jokers Requiring Additional Systems (8)
+### Stubbed Jokers Requiring Additional Systems (5)
 
-**Special Event Hooks (4):**
-Astronomer, Hallucination, MrBones, Perkeo
+**Special Event Hooks (3):**
+Hallucination, MrBones, Perkeo
 
 **Card Modification (1):**
 Mime
 
-**Complex/Missing Systems (3):**
-Matador, OopsAll6s, TradingCard
+**Complex/Missing Systems (1):**
+Matador
 
-**Total:** 8 unique stubbed jokers (some requirements overlap across categories)
+**Total:** 5 unique stubbed jokers (some requirements overlap across categories)
 
-**Note:** Phase 2 completed MarbleJoker and MidasMask (card modification). Phase 3 completed all 5 retrigger jokers (HangingChad, Hack, SockAndBuskin, Dusk, Seltzer). Phase 4 (partial) completed ToTheMoon and Vampire using existing hooks. Phase 5 completed Blueprint and Brainstorm (effect copying system). Phase 6 (partial) completed RiffRaff (creates jokers on blind select) and InvisibleJoker (OnRoundEnd tracker - OnSell duplication has limitations). Phase 7 completed Certificate (adds random card with seal on round begin). Remaining jokers require new infrastructure (OnPackOpen, OnShopEnd, discard tracking, death prevention, boss blind detection).
+**Note:** Phase 2 completed MarbleJoker and MidasMask (card modification). Phase 3 completed all 5 retrigger jokers (HangingChad, Hack, SockAndBuskin, Dusk, Seltzer). Phase 4 (partial) completed ToTheMoon and Vampire using existing hooks. Phase 5 completed Blueprint and Brainstorm (effect copying system). Phase 6 (partial) completed RiffRaff (creates jokers on blind select) and InvisibleJoker (OnRoundEnd tracker - OnSell duplication has limitations). Phase 7 completed Certificate (adds random card with seal on round begin). Phase 8 completed TradingCard (first discard destruction), Astronomer (free Planet cards), and OopsAll6s (partial probability doubling for shop rarity). Remaining jokers require new infrastructure (OnPackOpen, OnShopEnd, death prevention, boss blind detection, held card retrigger).
 
 ## Overview
 
@@ -165,7 +166,7 @@ Balatro uses the formula: `Score = (Base Chips + Card Chips + Bonus Chips) × (B
 | 19 | Certificate | $6 | When round begins, add random playing card with random seal to hand | Start | ✅ |
 | 20 | Acrobat | $6 | X3 Mult on final hand of round | Start | ✅ |
 | 21 | Spare Trousers | $6 | Gains +2 Mult if played hand contains Two Pair | Start | ✅ |
-| 22 | Trading Card | $5 | If first discard contains 1 card, destroy it and earn $3 | Start | 📝 |
+| 22 | Trading Card | $5 | If first discard contains 1 card, destroy it and earn $3 | Start | ✅ |
 | 23 | Flash Card | $5 | Gains +2 Mult per reroll in shop | Start | ✅ |
 | 24 | Onyx Agate | $7 | +7 Mult for each Club card played | Start | ✅ |
 | 25 | Bloodstone | $7 | 1 in 2 chance for Hearts to give X1.5 Mult when scored | Start | ✅ |
@@ -200,12 +201,12 @@ Balatro uses the formula: `Score = (Base Chips + Card Chips + Bonus Chips) × (B
 | 54 | Bootstraps | $6 | Gains +2 Mult for every $5 you have | Start | ✅ |
 | 55 | Turtle Bean | $5 | Gains +5 hand size; decreases by 1 per round | Start | ✅ |
 | 56 | Erosion | $6 | +4 Mult for each card below 52 in full deck | Start | ✅ |
-| 57 | Oops! All 6s | $4 | Doubles all probabilities | Start | 📝 |
+| 57 | Oops! All 6s | $4 | Doubles all probabilities | Start | 🔧 |
 | 58 | The Idol | $6 | X2 Mult for each [rank] of [suit] in hand; rank and suit change each round | Start | ✅ |
 | 59 | Seeing Double | $8 | X2 Mult if played hand has Club card and any other suit card | Start | ✅ |
 | 60 | Lucky Cat | $5 | Gains X0.25 Mult each time a Lucky card successfully triggers | Start | ✅ |
 | 61 | Cartomancer | $6 | Create Tarot card when Blind selected; requires empty consumable slot | Unlock | ✅ |
-| 62 | Astronomer | $8 | All Planet cards and Celestial Packs in shop are free | Unlock | 📝 |
+| 62 | Astronomer | $8 | All Planet cards and Celestial Packs in shop are free | Unlock | ✅ |
 | 63 | Vampire | $7 | Gains X0.2 Mult per Enhanced card played; removes enhancement | Unlock | ✅ |
 | 64 | Shortcut | $7 | Allows Straights to be made with gaps of 1 rank | Unlock | 📝 |
 

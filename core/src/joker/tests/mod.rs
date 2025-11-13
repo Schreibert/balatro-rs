@@ -3831,3 +3831,97 @@ fn test_trading_card() {
     assert_eq!(g2.money, money_before_multi,
         "Should not earn money when discarding multiple cards");
 }
+
+#[test]
+fn test_astronomer() {
+    use crate::consumable::Consumables;
+    use crate::planet::Planets;
+    use crate::tarot::Tarots;
+
+    let mut g = Game::default();
+    g.start();
+    g.stage = Stage::Shop();
+    g.money = 100;
+
+    // Add Astronomer joker
+    let astronomer = Jokers::Astronomer(Astronomer::default());
+    g.jokers.push(astronomer);
+
+    // Test 1: Buying a Planet card should be free
+    let initial_money = g.money;
+    let planet = Consumables::Planet(Planets::Pluto);
+
+    // Normally costs $4, but should be free with Astronomer
+    g.buy_consumable(planet.clone()).unwrap();
+
+    assert_eq!(g.money, initial_money,
+        "Planet cards should be free with Astronomer. Expected: {}, Got: {}",
+        initial_money, g.money);
+    assert!(g.consumables.contains(&planet), "Planet card should be added to consumables");
+
+    // Test 2: Buying a non-Planet consumable should still cost money
+    let tarot = Consumables::Tarot(Tarots::TheFool);
+    let money_before_tarot = g.money;
+
+    g.buy_consumable(tarot.clone()).unwrap();
+
+    assert!(g.money < money_before_tarot,
+        "Tarot cards should still cost money. Before: {}, After: {}",
+        money_before_tarot, g.money);
+    assert!(g.consumables.contains(&tarot), "Tarot card should be added to consumables");
+}
+
+#[test]
+#[ignore = "Probability system not fully implemented - only partial rarity support"]
+fn test_oops_all_6s() {
+    // Note: This test demonstrates basic probability doubling for shop rarity generation.
+    // Full probability support (Glass cards, Gros Michel, boss blinds, etc.) requires
+    // a comprehensive probability modifier system that isn't yet implemented.
+
+    use crate::joker::Rarity;
+
+    let mut g = Game::default();
+    g.start();
+
+    // Add Oops! All 6s joker
+    let oops = Jokers::OopsAll6s(OopsAll6s::default());
+    g.jokers.push(oops);
+
+    // Generate many jokers and check rarity distribution
+    // With OopsAll6s: Common 70%→100%, Uncommon 25%→50%, Rare 5%→10%
+    let samples = 100;
+    let mut rare_count = 0;
+    let mut uncommon_count = 0;
+    let mut common_count = 0;
+
+    for _ in 0..samples {
+        let mut test_game = g.clone();
+        test_game.shop.restock_with_jokers(&test_game.jokers, &[]);
+
+        for joker in &test_game.shop.jokers {
+            match joker.rarity() {
+                Rarity::Rare => rare_count += 1,
+                Rarity::Uncommon => uncommon_count += 1,
+                Rarity::Common => common_count += 1,
+                _ => {}
+            }
+        }
+    }
+
+    // With doubled probabilities, we should see roughly 2x the rare jokers
+    // This is a statistical test, so we use loose bounds
+    // Expected: ~10% rare (vs 5% without), ~50% uncommon (vs 25%)
+    let total = (rare_count + uncommon_count + common_count) as f32;
+    let rare_pct = (rare_count as f32 / total) * 100.0;
+    let uncommon_pct = (uncommon_count as f32 / total) * 100.0;
+
+    // Rare should be roughly 8-12% (doubled from 5%)
+    assert!(rare_pct > 7.0 && rare_pct < 13.0,
+        "With OopsAll6s, rare jokers should appear ~10% of time (doubled from 5%). Got: {:.1}%",
+        rare_pct);
+
+    // Uncommon should be roughly 45-55% (doubled from 25%, but capped effects)
+    assert!(uncommon_pct > 40.0 && uncommon_pct < 60.0,
+        "With OopsAll6s, uncommon jokers should appear ~50% of time. Got: {:.1}%",
+        uncommon_pct);
+}

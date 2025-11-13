@@ -935,14 +935,15 @@ All 20 boss blind modifiers fully implemented:
 - Shop mechanics: Purchase, sell, reroll
 - Dynamic pricing with voucher modifiers
 
-### Jokers: 150 Total (94.7% Complete)
+### Jokers: 150 Total (96.7% Complete)
 
-- **Tested (Passing):** 124 jokers (82.7%) - Fully functional with passing unit tests
+- **Tested (Passing):** 126 jokers (84%) - Fully functional with passing unit tests
 - **Implemented (Not Tested):** 15 jokers (10%) - Fully functional but no test coverage yet
-- **Test Issues:** 3 jokers (2%) - Implemented but tests have issues (FacelessJoker, Satellite, InvisibleJoker)
-- **Stubbed:** 8 jokers (5.3%) - Basic structure only, awaiting system support
+- **Test Issues:** 4 jokers (2.7%) - Implemented but tests have issues (FacelessJoker, Satellite, InvisibleJoker, OopsAll6s)
+- **Stubbed:** 5 jokers (3.3%) - Basic structure only, awaiting system support
 
 **Recent Progress:**
+- **Phase 8 Complete**: Implemented TradingCard (destroys first single-card discard for $3), Astronomer (makes Planet cards free in shop), and OopsAll6s (partial probability doubling for shop joker rarity - full implementation requires comprehensive probability system)
 - **Phase 7 Complete**: Implemented Certificate (adds random card with random seal on round begin using existing OnRoundBegin hook)
 - **Phase 6 Partial**: Implemented RiffRaff (creates 2 common jokers on blind select) and InvisibleJoker (OnRoundEnd tracker - OnSell duplication has limitations)
 - **Phase 5 Complete**: Implemented effect copying system - Blueprint (copies joker to right) and Brainstorm (copies leftmost joker)
@@ -951,16 +952,16 @@ All 20 boss blind modifiers fully implemented:
 - **Phase 2 Complete**: Implemented and tested MidasMask (converts face cards to Gold on score) and MarbleJoker (adds Stone card on blind select)
 - Implemented and tested GoldenTicket (OnPlay effect for Gold enhancement cards earning $3)
 - Implemented and tested DriverLicense (X3 mult when 16+ enhanced cards in deck)
-- Added tests for CreditCard, Splash, Drunkard (now passing)
+- Added discard tracking infrastructure (`discards_this_blind` counter) for TradingCard support
 - Fixed `update_modifiers()` to apply passive joker effects on buy/sell
 - Pareidolia modifier set but needs `card.is_face()` integration for full functionality
 
 **Implemented but Untested (15):**
 Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obelisk, Pareidolia, Ramen, RedCard, RideTheBus, SpaceJoker, Supernova, TheIdol, Throwback
 
-**Stubbed jokers** (8 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include special event hooks (OnPackOpen, OnShopEnd), discard tracking, death prevention, and boss blind detection. See docs/JOKERS.md for complete list.
+**Stubbed jokers** (5 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include special event hooks (OnPackOpen, OnShopEnd, OnBossBlindTrigger), death prevention system, and held card retrigger mechanics. See docs/JOKERS.md for complete list.
 
-All 142 functional jokers (124 tested + 15 untested + 3 with test issues) are error-free.
+All 145 functional jokers (126 tested + 15 untested + 4 with test issues) are error-free.
 
 ### Known Issues
 

@@ -853,11 +853,21 @@ impl Game {
         if self.consumables.len() >= self.config.consumable_slots {
             return Err(GameError::NoAvailableSlot);
         }
-        if consumable.cost() > self.money {
+
+        // Check if Astronomer joker makes this consumable free
+        let has_astronomer = self.jokers.iter().any(|j| matches!(j, Jokers::Astronomer(_)));
+        let is_planet = matches!(consumable, Consumables::Planet(_));
+        let cost = if has_astronomer && is_planet {
+            0 // Planet cards are free with Astronomer
+        } else {
+            consumable.cost()
+        };
+
+        if cost > self.money {
             return Err(GameError::InvalidBalance);
         }
         // TODO: shop.buy_consumable when shop has consumables
-        self.money -= consumable.cost();
+        self.money -= cost;
         self.consumables.push(consumable);
         return Ok(());
     }

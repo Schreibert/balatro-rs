@@ -464,7 +464,7 @@ impl Joker for OopsAll6s {
         "Oops! All 6s".to_string()
     }
     fn desc(&self) -> String {
-        "All ranks are 6s".to_string()
+        "Doubles all probabilities".to_string()
     }
     fn cost(&self) -> usize {
         4
@@ -476,7 +476,9 @@ impl Joker for OopsAll6s {
         vec![Categories::Effect]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Requires card rank modification system
+        // Passive effect - checked in shop probability generation
+        // Full implementation requires comprehensive probability system
+        // Currently only affects joker rarity probabilities
         vec![]
     }
 }

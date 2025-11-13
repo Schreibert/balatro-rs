@@ -114,6 +114,25 @@ impl Shop {
         self.config = config;
     }
 
+    /// Restock the shop with new items (convenience method)
+    /// Checks for jokers like Oops! All 6s that affect probabilities
+    pub fn restock_with_jokers(&mut self, jokers: &[Jokers], vouchers: &[Vouchers]) {
+        // Check for Oops! All 6s joker
+        let has_oops_all_6s = jokers.iter().any(|j| matches!(j, Jokers::OopsAll6s(_)));
+        if has_oops_all_6s {
+            self.joker_gen.set_probability_multiplier(2.0);
+        } else {
+            self.joker_gen.set_probability_multiplier(1.0);
+        }
+
+        self.refresh(vouchers);
+    }
+
+    /// Restock the shop with new items (simple version without joker checks)
+    pub fn restock(&mut self) {
+        self.refresh(&[]);
+    }
+
     /// Refresh the shop with new items
     pub fn refresh(&mut self, vouchers: &[Vouchers]) {
         self.jokers.clear();
@@ -307,12 +326,14 @@ impl Default for Shop {
 #[derive(Debug, Clone)]
 pub struct JokerGenerator {
     rarity_weights: [u32; 3], // Common, Uncommon, Rare
+    probability_multiplier: f32, // Multiplier for probabilities (e.g., 2.0 for Oops! All 6s)
 }
 
 impl JokerGenerator {
     pub fn new() -> Self {
         JokerGenerator {
             rarity_weights: [70, 25, 5], // Default: 70% common, 25% uncommon, 5% rare
+            probability_multiplier: 1.0,
         }
     }
 
@@ -321,15 +342,27 @@ impl JokerGenerator {
         self.rarity_weights = [70, 25, 5];
     }
 
+    pub fn set_probability_multiplier(&mut self, multiplier: f32) {
+        self.probability_multiplier = multiplier;
+    }
+
     /// Generate rarity of new joker
-    /// 70% chance Common, 25% chance Uncommon, 5% chance Rare
+    /// 70% chance Common, 25% chance Uncommon, 5% Rare (base weights)
+    /// Modified by probability_multiplier (e.g., Oops! All 6s doubles probabilities)
     /// Legendary can only appear from Soul Spectral Card
     fn gen_rarity(&self) -> Rarity {
-        let total: u32 = self.rarity_weights.iter().sum();
+        // Apply probability multiplier to uncommon and rare weights
+        // Common weight adjusted to fill remaining probability
+        let uncommon_weight = ((self.rarity_weights[1] as f32) * self.probability_multiplier).min(100.0) as u32;
+        let rare_weight = ((self.rarity_weights[2] as f32) * self.probability_multiplier).min(100.0) as u32;
+        let common_weight = 100 - uncommon_weight - rare_weight;
+
+        let weights = [common_weight, uncommon_weight, rare_weight];
+        let total: u32 = weights.iter().sum();
         let roll = thread_rng().gen_range(0..total);
 
         let mut cumulative = 0;
-        for (i, &weight) in self.rarity_weights.iter().enumerate() {
+        for (i, &weight) in weights.iter().enumerate() {
             cumulative += weight;
             if roll < cumulative {
                 return match i {
