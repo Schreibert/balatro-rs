@@ -5,10 +5,10 @@ This document provides a complete reference of ALL 150 jokers in Balatro, includ
 ## Testing & Implementation Status
 
 **Total: 150 Jokers**
-- ✅ **Tested (Passing):** 113 jokers (75%) - Fully functional with unit tests
+- ✅ **Tested (Passing):** 118 jokers (79%) - Fully functional with unit tests
 - ⚠️ **Implemented (Not Tested):** 16 jokers (11%) - Functional but no test coverage
 - 🔧 **Test Issues:** 2 jokers (1%) - Implemented but tests ignored due to test logic issues
-- 📝 **Stubbed:** 20 jokers (13%) - Basic structure only, awaiting system support
+- 📝 **Stubbed:** 15 jokers (10%) - Basic structure only, awaiting system support
 
 **Note:** The project has 1 failing test (`test_double_tag_stacking`) which is a core tag system bug unrelated to any specific joker. See PROJECT_STATUS.md for details.
 
@@ -23,10 +23,7 @@ Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obeli
 - **FacelessJoker** - OnDiscard effect not triggering in test (implementation functional)
 - **Satellite** - Test logic needs adjustment for base rewards (implementation functional)
 
-### Stubbed Jokers Requiring Additional Systems (20)
-
-**Retrigger System (5):**
-Dusk, Hack, HangingChad, Seltzer, SockAndBuskin
+### Stubbed Jokers Requiring Additional Systems (15)
 
 **Effect Copying (2):**
 Brainstorm, InvisibleJoker
@@ -40,9 +37,9 @@ Mime, RiffRaff
 **Complex/Missing Systems (3):**
 Matador, OopsAll6s, TradingCard
 
-**Total:** 20 unique stubbed jokers (some requirements overlap across categories)
+**Total:** 15 unique stubbed jokers (some requirements overlap across categories)
 
-**Note:** ChaosTheClown has been moved to "Implemented (Not Tested)" as it sets the free_reroll modifier. MarbleJoker and MidasMask have been implemented and tested.
+**Note:** ChaosTheClown has been moved to "Implemented (Not Tested)" as it sets the free_reroll modifier. Phase 2 completed MarbleJoker and MidasMask (card modification). Phase 3 completed all 5 retrigger jokers (HangingChad, Hack, SockAndBuskin, Dusk, Seltzer).
 
 ## Overview
 
@@ -154,10 +151,10 @@ Balatro uses the formula: `Score = (Base Chips + Card Chips + Bonus Chips) × (B
 | 3 | Ceremonial Dagger | $6 | When Blind selected, destroys Joker to the right; adds double sell value to Mult | Start | 📝 |
 | 4 | Marble Joker | $6 | Adds one Stone card to deck when Blind selected | Start | ✅ |
 | 5 | Loyalty Card | $5 | X4 Mult every 6 hands played; {0} remaining | Start | ✅ |
-| 6 | Dusk | $5 | Retrigger all played cards in final hand of round | Start | 📝 |
+| 6 | Dusk | $5 | Retrigger all played cards in final hand of round | Start | ✅ |
 | 7 | Fibonacci | $8 | Each played Ace, 2, 3, 5, or 8 gives +8 Mult when scored | Start | ✅ |
 | 8 | Steel Joker | $7 | Gains X0.2 Mult for each Steel Card in full deck | Start | ✅ |
-| 9 | Hack | $6 | Retrigger each played 2, 3, 4, or 5 | Start | 📝 |
+| 9 | Hack | $6 | Retrigger each played 2, 3, 4, or 5 | Start | ✅ |
 | 10 | Pareidolia | $5 | All cards considered face cards | Start | ✅ |
 | 11 | Space Joker | $5 | 1 in 4 chance to upgrade level of played poker hand | Start | ✅ |
 | 12 | Burglar | $6 | When Blind selected, +3 Hands and lose all discards | Start | ✅ |
@@ -189,10 +186,10 @@ Balatro uses the formula: `Score = (Base Chips + Card Chips + Bonus Chips) × (B
 | 38 | Bull | $6 | +2 Chips for each $1 you have | Start | ✅ |
 | 39 | Luchador | $6 | Sell this to disable current Boss Blind | Start | ✅ |
 | 40 | Diet Cola | $6 | Sell this to create free Double Tag | Start | ✅ |
-| 41 | Seltzer | $6 | Retrigger all played cards for next 10 hands | Start | ⚠️ |
+| 41 | Seltzer | $6 | Retrigger all played cards for next 10 hands | Start | ✅ |
 | 42 | Castle | $6 | Gains +3 Chips per discarded card of each suit; resets when suit changes | Start | ⚠️ |
 | 43 | Joker Stencil | $8 | X1 Mult for each empty Joker slot (counts itself as empty) | Start | ✅ |
-| 44 | Sock and Buskin | $6 | Retrigger all played face cards | Start | 📝 |
+| 44 | Sock and Buskin | $6 | Retrigger all played face cards | Start | ✅ |
 | 45 | Hologram | $6 | Gains X0.25 Mult when a playing card added to deck | Start | ✅ |
 | 46 | Matador | $7 | Earn $8 if played hand triggers Boss Blind ability | Start | 📝 |
 | 47 | To the Moon | $5 | Earn $1 per $5 in excess of $20; excess lowers by $5 after round | Start | 📝 |

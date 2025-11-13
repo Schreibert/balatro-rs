@@ -2288,6 +2288,40 @@ fn test_mr_bones() {
 }
 
 #[test]
+fn test_hanging_chad() {
+    // Hanging Chad: Retrigger first card 2 additional times (3 total triggers)
+    use crate::card::{Card, Suit, Value};
+
+    let c1 = Card::new(Value::Ace, Suit::Heart);
+    let c2 = Card::new(Value::King, Suit::Diamond);
+
+    // Test WITHOUT HangingChad joker
+    let mut g_without = Game::default();
+    g_without.start();
+    g_without.stage = Stage::Blind(Blind::Small, None);
+    let score_without = g_without.calc_score(SelectHand::new(vec![c1, c2]).best_hand().unwrap());
+
+    // Test WITH HangingChad joker
+    let mut g_with = Game::default();
+    g_with.start();
+    g_with.money += 1000;
+    g_with.stage = Stage::Shop();
+    let joker = Jokers::HangingChad(HangingChad::default());
+    g_with.shop.jokers.push(joker.clone());
+    g_with.buy_joker(joker).unwrap();
+    g_with.stage = Stage::Blind(Blind::Small, None);
+    let score_with = g_with.calc_score(SelectHand::new(vec![c1, c2]).best_hand().unwrap());
+
+    // With HangingChad, first card (Ace) should trigger 3 times total (1 base + 2 bonus)
+    // Second card (King) triggers once normally
+    // So first card contributes ~3x its normal contribution
+    assert!(score_with > score_without, "HangingChad should increase score. Without: {}, With: {}", score_without, score_with);
+    // Verify significant increase
+    let increase_ratio = score_with as f32 / score_without as f32;
+    assert!(increase_ratio >= 1.3, "HangingChad should increase score by at least 30%. Ratio: {:.2}, Without: {}, With: {}", increase_ratio, score_without, score_with);
+}
+
+#[test]
 fn test_hack() {
     // Hack: Retrigger each played 2, 3, 4, or 5
     use crate::card::{Card, Suit, Value};

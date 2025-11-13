@@ -641,7 +641,7 @@ impl Game {
                 }
 
                 // Jokers can add retrigger bonuses
-                trigger_count += self.get_joker_retrigger_bonus(card);
+                trigger_count += self.get_joker_retrigger_bonus(card, cards_played_count);
 
                 for _ in 0..trigger_count {
                     // Add chips from card (includes enhancement and edition bonuses)
@@ -1498,7 +1498,7 @@ impl Game {
     }
 
     /// Get additional retrigger count for a card from active jokers
-    fn get_joker_retrigger_bonus(&self, card: &crate::card::Card) -> usize {
+    fn get_joker_retrigger_bonus(&self, card: &crate::card::Card, card_index: usize) -> usize {
         use crate::card::Value;
         use crate::joker::Jokers;
 
@@ -1506,6 +1506,12 @@ impl Game {
 
         for joker in &self.jokers {
             match joker {
+                // HangingChad: Retrigger first card 2 additional times
+                Jokers::HangingChad(_) => {
+                    if card_index == 0 {
+                        bonus += 2;
+                    }
+                }
                 // Hack: Retrigger 2, 3, 4, or 5
                 Jokers::Hack(_) => {
                     if matches!(card.value, Value::Two | Value::Three | Value::Four | Value::Five) {

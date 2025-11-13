@@ -20,7 +20,7 @@
 
 ## Project Overview
 
-balatro-rs is a Rust implementation of Balatro, a poker roguelike deckbuilder game. The project provides a complete game engine with move generation capabilities specifically designed for reinforcement learning applications. The implementation achieves approximately 85% feature parity with the full game.
+balatro-rs is a Rust implementation of Balatro, a poker roguelike deckbuilder game. The project provides a complete game engine with move generation capabilities specifically designed for reinforcement learning applications. The implementation achieves approximately 87% feature parity with the full game.
 
 ### Project Structure
 
@@ -935,14 +935,15 @@ All 20 boss blind modifiers fully implemented:
 - Shop mechanics: Purchase, sell, reroll
 - Dynamic pricing with voucher modifiers
 
-### Jokers: 150 Total (87% Complete)
+### Jokers: 150 Total (90% Complete)
 
-- **Tested (Passing):** 113 jokers (75%) - Fully functional with passing unit tests
-- **Implemented (Not Tested):** 16 jokers (11%) - Fully functional but no test coverage yet
+- **Tested (Passing):** 118 jokers (79%) - Fully functional with passing unit tests
+- **Implemented (Not Tested):** 15 jokers (10%) - Fully functional but no test coverage yet
 - **Test Issues:** 2 jokers (1%) - Implemented but tests have logic issues (FacelessJoker, Satellite)
-- **Stubbed:** 20 jokers (13%) - Basic structure only, awaiting system support
+- **Stubbed:** 15 jokers (10%) - Basic structure only, awaiting system support
 
 **Recent Progress:**
+- **Phase 3 Complete**: Implemented all 5 retrigger jokers (HangingChad, Hack, SockAndBuskin, Dusk, Seltzer)
 - **Phase 2 Complete**: Implemented and tested MidasMask (converts face cards to Gold on score) and MarbleJoker (adds Stone card on blind select)
 - Implemented and tested GoldenTicket (OnPlay effect for Gold enhancement cards earning $3)
 - Implemented and tested DriverLicense (X3 mult when 16+ enhanced cards in deck)
@@ -950,12 +951,12 @@ All 20 boss blind modifiers fully implemented:
 - Fixed `update_modifiers()` to apply passive joker effects on buy/sell
 - Pareidolia modifier set but needs `card.is_face()` integration for full functionality
 
-**Implemented but Untested (16):**
+**Implemented but Untested (15):**
 Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obelisk, Pareidolia, Ramen, RedCard, RideTheBus, SpaceJoker, Supernova, TheIdol, Throwback
 
-**Stubbed jokers** (20 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include retrigger/hook systems, card modification mechanics, enhancement support, effect copying, death prevention, and boss blind detection. See docs/JOKERS.md for complete list.
+**Stubbed jokers** (15 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include special event hooks, effect copying, card modification mechanics, and complex probability systems. See docs/JOKERS.md for complete list.
 
-All 131 functional jokers (113 tested + 16 untested + 2 with test issues) are error-free.
+All 135 functional jokers (118 tested + 15 untested + 2 with test issues) are error-free.
 
 ### Known Issues
 
