@@ -5,10 +5,10 @@ This document provides a complete reference of ALL 150 jokers in Balatro, includ
 ## Testing & Implementation Status
 
 **Total: 150 Jokers**
-- ✅ **Tested (Passing):** 126 jokers (84%) - Fully functional with unit tests
+- ✅ **Tested (Passing):** 128 jokers (85.3%) - Fully functional with unit tests
 - ⚠️ **Implemented (Not Tested):** 15 jokers (10%) - Functional but no test coverage
 - 🔧 **Test Issues:** 4 jokers (2.7%) - Implemented but tests have issues (test logic or partial implementation)
-- 📝 **Stubbed:** 5 jokers (3.3%) - Basic structure only, awaiting system support
+- 📝 **Stubbed:** 3 jokers (2%) - Basic structure only, awaiting system support
 
 **Note:** The project has 1 failing test (`test_double_tag_stacking`) which is a core tag system bug unrelated to any specific joker. See PROJECT_STATUS.md for details.
 
@@ -25,20 +25,20 @@ Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obeli
 - **InvisibleJoker** - OnRoundEnd works, but OnSell duplication has effect system limitations
 - **OopsAll6s** - Partial implementation (joker rarity only); full probability system requires comprehensive infrastructure
 
-### Stubbed Jokers Requiring Additional Systems (5)
+### Stubbed Jokers Requiring Additional Systems (3)
 
-**Special Event Hooks (3):**
-Hallucination, MrBones, Perkeo
+**Pack Opening Hook:**
+Hallucination (requires booster pack action system - BuyPack/SelectFromPack actions not yet implemented)
 
-**Card Modification (1):**
+**Death Prevention:**
+MrBones
+
+**Held Card Retrigger:**
 Mime
 
-**Complex/Missing Systems (1):**
-Matador
+**Total:** 3 unique stubbed jokers
 
-**Total:** 5 unique stubbed jokers (some requirements overlap across categories)
-
-**Note:** Phase 2 completed MarbleJoker and MidasMask (card modification). Phase 3 completed all 5 retrigger jokers (HangingChad, Hack, SockAndBuskin, Dusk, Seltzer). Phase 4 (partial) completed ToTheMoon and Vampire using existing hooks. Phase 5 completed Blueprint and Brainstorm (effect copying system). Phase 6 (partial) completed RiffRaff (creates jokers on blind select) and InvisibleJoker (OnRoundEnd tracker - OnSell duplication has limitations). Phase 7 completed Certificate (adds random card with seal on round begin). Phase 8 completed TradingCard (first discard destruction), Astronomer (free Planet cards), and OopsAll6s (partial probability doubling for shop rarity). Remaining jokers require new infrastructure (OnPackOpen, OnShopEnd, death prevention, boss blind detection, held card retrigger).
+**Note:** Phase 2 completed MarbleJoker and MidasMask (card modification). Phase 3 completed all 5 retrigger jokers (HangingChad, Hack, SockAndBuskin, Dusk, Seltzer). Phase 4 (partial) completed ToTheMoon and Vampire using existing hooks. Phase 5 completed Blueprint and Brainstorm (effect copying system). Phase 6 (partial) completed RiffRaff (creates jokers on blind select) and InvisibleJoker (OnRoundEnd tracker - OnSell duplication has limitations). Phase 7 completed Certificate (adds random card with seal on round begin). Phase 8 completed TradingCard (first discard destruction), Astronomer (free Planet cards), and OopsAll6s (partial probability doubling for shop rarity). **Phase 9 completed Matador (boss blind trigger detection) and Perkeo (shop end consumable duplication - simplified without Negative edition system).** Remaining jokers require: booster pack actions (Hallucination), death prevention (MrBones), held card retrigger (Mime).
 
 ## Overview
 

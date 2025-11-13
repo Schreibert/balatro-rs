@@ -2104,27 +2104,6 @@ fn test_turtle_bean() {
     }
 }
 
-
-#[test]
-#[ignore = "Needs boss blind trigger detection"]
-fn test_matador() {
-    // Matador: Earn $8 if played hand triggers Boss Blind ability
-    let mut g = Game::default();
-    g.start();
-
-    g.money = 100;
-    let initial_money = g.money;
-    g.stage = Stage::Shop();
-    let joker = Jokers::Matador(Matador::default());
-    g.shop.jokers.push(joker.clone());
-    g.buy_joker(joker).unwrap();
-
-    // TODO: Set up boss blind
-    // TODO: Play hand that triggers boss ability
-    // TODO: Verify $8 is earned
-    // assert_eq!(g.money, initial_money + 8, "Should earn $8 when triggering boss blind");
-}
-
 #[test]
 fn test_vagabond() {
     // Vagabond: Create Tarot card if hand played with $4 or less
@@ -3924,4 +3903,219 @@ fn test_oops_all_6s() {
     assert!(uncommon_pct > 40.0 && uncommon_pct < 60.0,
         "With OopsAll6s, uncommon jokers should appear ~50% of time. Got: {:.1}%",
         uncommon_pct);
+}
+
+#[test]
+fn test_matador() {
+    use crate::boss_modifier::BossModifier;
+
+    let mut g = Game::default();
+    g.start();
+
+    // Set up boss blind with TheHook (discards 2 cards after each play)
+    g.stage = Stage::Blind(Blind::Boss, Some(BossModifier::TheHook));
+    g.blind = Some(Blind::Boss);
+    g.plays = 10;
+
+    // Add Matador joker
+    let matador = Jokers::Matador(Matador {});
+    g.jokers.push(matador);
+
+    // Re-register effects
+    g.effect_registry = crate::effect::EffectRegistry::new();
+    g.effect_registry.register_jokers(g.jokers.clone(), &g.clone());
+
+    // Deal cards
+    g.deal();
+
+    let initial_money = g.money;
+
+    // Select and play a hand
+    let cards = g.available.cards();
+    g.select_card(cards[0]).unwrap();
+    g.handle_action(Action::Play()).unwrap();
+
+    // Matador should earn $8 because TheHook triggered (discarded 2 cards)
+    assert_eq!(g.money, initial_money + 8,
+        "Matador should earn $8 when boss blind ability triggers. Expected: {}, Got: {}",
+        initial_money + 8, g.money);
+}
+
+#[test]
+fn test_matador_the_serpent() {
+    use crate::boss_modifier::BossModifier;
+
+    let mut g = Game::default();
+    g.start();
+
+    // Set up boss blind with TheSerpent (first hand scores 0)
+    g.stage = Stage::Blind(Blind::Boss, Some(BossModifier::TheSerpent));
+    g.blind = Some(Blind::Boss);
+    g.plays = 10;
+
+    // Add Matador joker
+    let matador = Jokers::Matador(Matador {});
+    g.jokers.push(matador);
+
+    // Re-register effects
+    g.effect_registry = crate::effect::EffectRegistry::new();
+    g.effect_registry.register_jokers(g.jokers.clone(), &g.clone());
+
+    // Deal cards
+    g.deal();
+
+    let initial_money = g.money;
+
+    // Select and play first hand (should trigger TheSerpent)
+    let cards = g.available.cards();
+    g.select_card(cards[0]).unwrap();
+    g.handle_action(Action::Play()).unwrap();
+
+    // Matador should earn $8 because TheSerpent triggered (made first hand score 0)
+    assert_eq!(g.money, initial_money + 8,
+        "Matador should earn $8 when TheSerpent triggers. Expected: {}, Got: {}",
+        initial_money + 8, g.money);
+
+    // Second hand should not trigger Matador (TheSerpent only affects first hand)
+    let money_after_first = g.money;
+    let cards = g.available.cards();
+    g.select_card(cards[0]).unwrap();
+    g.handle_action(Action::Play()).unwrap();
+
+    assert_eq!(g.money, money_after_first,
+        "Matador should not earn money on second hand. Expected: {}, Got: {}",
+        money_after_first, g.money);
+}
+
+#[test]
+fn test_matador_no_trigger() {
+    use crate::boss_modifier::BossModifier;
+
+    let mut g = Game::default();
+    g.start();
+
+    // Set up boss blind with TheWall (only increases score requirement, no trigger)
+    g.stage = Stage::Blind(Blind::Boss, Some(BossModifier::TheWall));
+    g.blind = Some(Blind::Boss);
+    g.plays = 10;
+
+    // Add Matador joker
+    let matador = Jokers::Matador(Matador {});
+    g.jokers.push(matador);
+
+    // Re-register effects
+    g.effect_registry = crate::effect::EffectRegistry::new();
+    g.effect_registry.register_jokers(g.jokers.clone(), &g.clone());
+
+    // Deal cards
+    g.deal();
+
+    let initial_money = g.money;
+
+    // Select and play a hand
+    let cards = g.available.cards();
+    g.select_card(cards[0]).unwrap();
+    g.handle_action(Action::Play()).unwrap();
+
+    // Matador should NOT earn money because TheWall doesn't trigger
+    assert_eq!(g.money, initial_money,
+        "Matador should not earn money with TheWall (no trigger). Expected: {}, Got: {}",
+        initial_money, g.money);
+}
+
+#[test]
+fn test_perkeo() {
+    use crate::consumable::Consumables;
+    use crate::tarot::Tarots;
+
+    let mut g = Game::default();
+    g.start();
+    g.stage = Stage::Shop();
+
+    // Add Perkeo joker
+    let perkeo = Jokers::Perkeo(Perkeo {});
+    g.jokers.push(perkeo);
+
+    // Re-register effects
+    g.effect_registry = crate::effect::EffectRegistry::new();
+    g.effect_registry.register_jokers(g.jokers.clone(), &g.clone());
+
+    // Add a consumable
+    let tarot = Consumables::Tarot(Tarots::TheFool);
+    g.consumables.push(tarot.clone());
+
+    assert_eq!(g.consumables.len(), 1, "Should have 1 consumable before shop end");
+
+    // End shop (should trigger Perkeo)
+    g.handle_action(Action::NextRound()).unwrap();
+
+    // Should have 2 consumables now (original + duplicated)
+    assert_eq!(g.consumables.len(), 2,
+        "Perkeo should duplicate a consumable at shop end. Expected: 2, Got: {}",
+        g.consumables.len());
+
+    // Both consumables should be the same (duplicated)
+    assert_eq!(g.consumables[0], g.consumables[1],
+        "Duplicated consumable should match the original");
+}
+
+#[test]
+fn test_perkeo_no_space() {
+    use crate::consumable::Consumables;
+    use crate::tarot::Tarots;
+
+    let mut g = Game::default();
+    g.start();
+    g.stage = Stage::Shop();
+
+    // Add Perkeo joker
+    let perkeo = Jokers::Perkeo(Perkeo {});
+    g.jokers.push(perkeo);
+
+    // Re-register effects
+    g.effect_registry = crate::effect::EffectRegistry::new();
+    g.effect_registry.register_jokers(g.jokers.clone(), &g.clone());
+
+    // Fill all consumable slots
+    let max_slots = g.config.consumable_slots;
+    for _ in 0..max_slots {
+        g.consumables.push(Consumables::Tarot(Tarots::TheFool));
+    }
+
+    assert_eq!(g.consumables.len(), max_slots,
+        "Should have all slots filled before shop end");
+
+    // End shop (Perkeo should try but fail due to no space)
+    g.handle_action(Action::NextRound()).unwrap();
+
+    // Should still have max slots (no duplicate added)
+    assert_eq!(g.consumables.len(), max_slots,
+        "Perkeo should not duplicate if no space. Expected: {}, Got: {}",
+        max_slots, g.consumables.len());
+}
+
+#[test]
+fn test_perkeo_no_consumables() {
+    let mut g = Game::default();
+    g.start();
+    g.stage = Stage::Shop();
+
+    // Add Perkeo joker
+    let perkeo = Jokers::Perkeo(Perkeo {});
+    g.jokers.push(perkeo);
+
+    // Re-register effects
+    g.effect_registry = crate::effect::EffectRegistry::new();
+    g.effect_registry.register_jokers(g.jokers.clone(), &g.clone());
+
+    // No consumables
+    assert_eq!(g.consumables.len(), 0, "Should have 0 consumables");
+
+    // End shop (Perkeo should do nothing)
+    g.handle_action(Action::NextRound()).unwrap();
+
+    // Should still have 0 consumables
+    assert_eq!(g.consumables.len(), 0,
+        "Perkeo should not create consumables if none exist. Expected: 0, Got: {}",
+        g.consumables.len());
 }

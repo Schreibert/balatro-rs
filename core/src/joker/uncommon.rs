@@ -1767,9 +1767,9 @@ impl Joker for Matador {
         vec![Categories::Economy]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Need boss blind trigger detection system
-        // TODO: Need OnBossBlindTrigger effect type
-        vec![]
+        vec![Effects::OnBossBlindTrigger(Arc::new(Mutex::new(|game: &mut Game| {
+            game.money += 8;
+        })))]
     }
 }
 

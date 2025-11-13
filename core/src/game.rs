@@ -537,6 +537,16 @@ impl Game {
             let cards_to_discard = modifier.cards_to_discard_after_play();
             if cards_to_discard > 0 {
                 let discarded_count = self.available.remove_random(cards_to_discard);
+
+                // Trigger OnBossBlindTrigger (e.g., Matador)
+                let effects = self.effect_registry.on_boss_blind_trigger.clone();
+                for effect in effects {
+                    if let crate::effect::Effects::OnBossBlindTrigger(callback) = effect {
+                        let cb = callback.lock().unwrap();
+                        cb(self);
+                    }
+                }
+
                 // Draw to replace both played and discarded cards
                 self.draw(removed + discarded_count);
             } else {
@@ -610,6 +620,16 @@ impl Game {
         if boss_modifier.map(|m| m.first_hand_scores_zero()).unwrap_or(false) {
             if self.hands_played_this_blind == 0 {
                 self.hands_played_this_blind += 1;
+
+                // Trigger OnBossBlindTrigger (e.g., Matador)
+                let effects = self.effect_registry.on_boss_blind_trigger.clone();
+                for effect in effects {
+                    if let crate::effect::Effects::OnBossBlindTrigger(callback) = effect {
+                        let cb = callback.lock().unwrap();
+                        cb(self);
+                    }
+                }
+
                 return 0;
             }
         }
@@ -704,7 +724,18 @@ impl Game {
         // The Tooth: lose $1 per card played
         if let Some(modifier) = boss_modifier {
             let money_cost = modifier.money_per_card() * cards_played_count;
-            self.money = self.money.saturating_sub(money_cost);
+            if money_cost > 0 {
+                self.money = self.money.saturating_sub(money_cost);
+
+                // Trigger OnBossBlindTrigger (e.g., Matador)
+                let effects = self.effect_registry.on_boss_blind_trigger.clone();
+                for effect in effects {
+                    if let crate::effect::Effects::OnBossBlindTrigger(callback) = effect {
+                        let cb = callback.lock().unwrap();
+                        cb(self);
+                    }
+                }
+            }
         }
 
         // The Arm: decrease hand level by 1 after play
@@ -712,6 +743,15 @@ impl Game {
             if let Some(current_level) = self.hand_levels.get_mut(&hand.rank) {
                 if current_level.level > 1 {
                     *current_level = current_level.downgrade();
+
+                    // Trigger OnBossBlindTrigger (e.g., Matador)
+                    let effects = self.effect_registry.on_boss_blind_trigger.clone();
+                    for effect in effects {
+                        if let crate::effect::Effects::OnBossBlindTrigger(callback) = effect {
+                            let cb = callback.lock().unwrap();
+                            cb(self);
+                        }
+                    }
                 }
             }
         }
@@ -1792,6 +1832,17 @@ impl Game {
     }
 
     fn next_round(&mut self) -> Result<(), GameError> {
+        // Trigger OnShopEnd effects before leaving shop (e.g., Perkeo)
+        if self.stage == Stage::Shop() {
+            let effects = self.effect_registry.on_shop_end.clone();
+            for effect in effects {
+                if let crate::effect::Effects::OnShopEnd(callback) = effect {
+                    let cb = callback.lock().unwrap();
+                    cb(self);
+                }
+            }
+        }
+
         self.stage = Stage::PreBlind();
         self.round += 1;
         return Ok(());

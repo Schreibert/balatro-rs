@@ -13,6 +13,9 @@ pub struct EffectRegistry {
     pub on_round_end: Vec<Effects>,
     pub on_blind_select: Vec<Effects>,
     pub on_sell: Vec<Effects>,
+    pub on_pack_open: Vec<Effects>,      // For Hallucination joker
+    pub on_shop_end: Vec<Effects>,       // For Perkeo joker
+    pub on_boss_blind_trigger: Vec<Effects>, // For Matador joker
 }
 
 impl EffectRegistry {
@@ -26,6 +29,9 @@ impl EffectRegistry {
             on_round_end: Vec::new(),
             on_blind_select: Vec::new(),
             on_sell: Vec::new(),
+            on_pack_open: Vec::new(),
+            on_shop_end: Vec::new(),
+            on_boss_blind_trigger: Vec::new(),
         };
     }
     pub(crate) fn register_jokers(&mut self, jokers: Vec<Jokers>, game: &Game) {
@@ -68,6 +74,9 @@ impl EffectRegistry {
                     Effects::OnRoundEnd(_) => self.on_round_end.push(e),
                     Effects::OnBlindSelect(_) => self.on_blind_select.push(e),
                     Effects::OnSell(_) => self.on_sell.push(e),
+                    Effects::OnPackOpen(_) => self.on_pack_open.push(e),
+                    Effects::OnShopEnd(_) => self.on_shop_end.push(e),
+                    Effects::OnBossBlindTrigger(_) => self.on_boss_blind_trigger.push(e),
                 }
             }
         }
@@ -86,6 +95,9 @@ pub enum Effects {
     OnRoundEnd(Arc<Mutex<dyn Fn(&mut Game) + Send + 'static>>),
     OnBlindSelect(Arc<Mutex<dyn Fn(&mut Game) + Send + 'static>>),
     OnSell(Arc<Mutex<dyn Fn(&mut Game) + Send + 'static>>),
+    OnPackOpen(Arc<Mutex<dyn Fn(&mut Game) + Send + 'static>>),      // Hallucination
+    OnShopEnd(Arc<Mutex<dyn Fn(&mut Game) + Send + 'static>>),       // Perkeo
+    OnBossBlindTrigger(Arc<Mutex<dyn Fn(&mut Game) + Send + 'static>>), // Matador
 }
 
 impl std::fmt::Debug for Effects {
@@ -99,6 +111,9 @@ impl std::fmt::Debug for Effects {
             Self::OnRoundEnd(_) => write!(f, "OnRoundEnd"),
             Self::OnBlindSelect(_) => write!(f, "OnBlindSelect"),
             Self::OnSell(_) => write!(f, "OnSell"),
+            Self::OnPackOpen(_) => write!(f, "OnPackOpen"),
+            Self::OnShopEnd(_) => write!(f, "OnShopEnd"),
+            Self::OnBossBlindTrigger(_) => write!(f, "OnBossBlindTrigger"),
         }
     }
 }

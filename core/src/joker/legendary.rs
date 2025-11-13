@@ -226,9 +226,23 @@ impl Joker for Perkeo {
         vec![Categories::Effect]
     }
     fn effects(&self, _game: &Game) -> Vec<Effects> {
-        // TODO: Need OnShopEnd effect type
-        // TODO: Need Negative edition system
-        // TODO: Need consumable duplication system
-        vec![]
+        vec![Effects::OnShopEnd(Arc::new(Mutex::new(|game: &mut Game| {
+            // Only duplicate if we have consumables and space for more
+            if game.consumables.is_empty() {
+                return;
+            }
+            if game.consumables.len() >= game.config.consumable_slots {
+                return;
+            }
+
+            // Pick a random consumable to duplicate
+            use rand::seq::SliceRandom;
+            let mut rng = rand::thread_rng();
+            if let Some(consumable) = game.consumables.choose(&mut rng) {
+                // TODO: Full implementation should create a "Negative" edition consumable
+                // which provides +1 consumable slot. For now, just duplicate if space available.
+                game.consumables.push(consumable.clone());
+            }
+        })))]
     }
 }
