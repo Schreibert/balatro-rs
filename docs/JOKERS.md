@@ -5,10 +5,10 @@ This document provides a complete reference of ALL 150 jokers in Balatro, includ
 ## Testing & Implementation Status
 
 **Total: 150 Jokers**
-- ✅ **Tested (Passing):** 111 jokers (74%) - Fully functional with unit tests
+- ✅ **Tested (Passing):** 113 jokers (75%) - Fully functional with unit tests
 - ⚠️ **Implemented (Not Tested):** 16 jokers (11%) - Functional but no test coverage
 - 🔧 **Test Issues:** 2 jokers (1%) - Implemented but tests ignored due to test logic issues
-- 📝 **Stubbed:** 22 jokers (15%) - Basic structure only, awaiting system support
+- 📝 **Stubbed:** 20 jokers (13%) - Basic structure only, awaiting system support
 
 **Note:** The project has 1 failing test (`test_double_tag_stacking`) which is a core tag system bug unrelated to any specific joker. See PROJECT_STATUS.md for details.
 
@@ -23,7 +23,7 @@ Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obeli
 - **FacelessJoker** - OnDiscard effect not triggering in test (implementation functional)
 - **Satellite** - Test logic needs adjustment for base rewards (implementation functional)
 
-### Stubbed Jokers Requiring Additional Systems (22)
+### Stubbed Jokers Requiring Additional Systems (20)
 
 **Retrigger System (5):**
 Dusk, Hack, HangingChad, Seltzer, SockAndBuskin
@@ -34,15 +34,15 @@ Brainstorm, InvisibleJoker
 **Special Event Hooks (7):**
 Astronomer, Certificate, Hallucination, MrBones, Perkeo, ToTheMoon, Vampire
 
-**Card Modification (4):**
-MarbleJoker, Mime, RiffRaff, SmearedJoker
+**Card Modification (2):**
+Mime, RiffRaff
 
 **Complex/Missing Systems (3):**
 Matador, OopsAll6s, TradingCard
 
-**Total:** 22 unique stubbed jokers (some requirements overlap across categories)
+**Total:** 20 unique stubbed jokers (some requirements overlap across categories)
 
-**Note:** ChaosTheClown has been moved to "Implemented (Not Tested)" as it sets the free_reroll modifier.
+**Note:** ChaosTheClown has been moved to "Implemented (Not Tested)" as it sets the free_reroll modifier. MarbleJoker and MidasMask have been implemented and tested.
 
 ## Overview
 
@@ -200,7 +200,7 @@ Balatro uses the formula: `Score = (Base Chips + Card Chips + Bonus Chips) × (B
 | 49 | Madness | $7 | When Small or Big Blind selected, destroy random Joker and create 2 free Jokers | Start | 📝 |
 | 50 | Ramen | $6 | X2 Mult; loses X0.01 Mult per card discarded | Start | ⚠️ |
 | 51 | Throwback | $6 | X0.25 Mult for each Blind skipped this run | Start | ✅ |
-| 52 | Midas Mask | $7 | All face cards become Gold cards when scored | Start | 📝 |
+| 52 | Midas Mask | $7 | All face cards become Gold cards when scored | Start | ✅ |
 | 53 | Satellite | $6 | Earn $1 at end of round per unique Planet card used this run | Start | ✅ |
 | 54 | Bootstraps | $6 | Gains +2 Mult for every $5 you have | Start | ✅ |
 | 55 | Turtle Bean | $5 | Gains +5 hand size; decreases by 1 per round | Start | ✅ |

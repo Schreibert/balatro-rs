@@ -20,7 +20,7 @@
 
 ## Project Overview
 
-balatro-rs is a Rust implementation of Balatro, a poker roguelike deckbuilder game. The project provides a complete game engine with move generation capabilities specifically designed for reinforcement learning applications. The implementation achieves approximately 84% feature parity with the full game.
+balatro-rs is a Rust implementation of Balatro, a poker roguelike deckbuilder game. The project provides a complete game engine with move generation capabilities specifically designed for reinforcement learning applications. The implementation achieves approximately 85% feature parity with the full game.
 
 ### Project Structure
 
@@ -935,14 +935,15 @@ All 20 boss blind modifiers fully implemented:
 - Shop mechanics: Purchase, sell, reroll
 - Dynamic pricing with voucher modifiers
 
-### Jokers: 150 Total (86% Complete)
+### Jokers: 150 Total (87% Complete)
 
-- **Tested (Passing):** 111 jokers (74%) - Fully functional with passing unit tests
+- **Tested (Passing):** 113 jokers (75%) - Fully functional with passing unit tests
 - **Implemented (Not Tested):** 16 jokers (11%) - Fully functional but no test coverage yet
 - **Test Issues:** 2 jokers (1%) - Implemented but tests have logic issues (FacelessJoker, Satellite)
-- **Stubbed:** 22 jokers (15%) - Basic structure only, awaiting system support
+- **Stubbed:** 20 jokers (13%) - Basic structure only, awaiting system support
 
 **Recent Progress:**
+- **Phase 2 Complete**: Implemented and tested MidasMask (converts face cards to Gold on score) and MarbleJoker (adds Stone card on blind select)
 - Implemented and tested GoldenTicket (OnPlay effect for Gold enhancement cards earning $3)
 - Implemented and tested DriverLicense (X3 mult when 16+ enhanced cards in deck)
 - Added tests for CreditCard, Splash, Drunkard (now passing)
@@ -952,9 +953,9 @@ All 20 boss blind modifiers fully implemented:
 **Implemented but Untested (16):**
 Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obelisk, Pareidolia, Ramen, RedCard, RideTheBus, SpaceJoker, Supernova, TheIdol, Throwback
 
-**Stubbed jokers** (22 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include retrigger/hook systems, card modification mechanics, enhancement support, effect copying, death prevention, and boss blind detection. See docs/JOKERS.md for complete list.
+**Stubbed jokers** (20 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include retrigger/hook systems, card modification mechanics, enhancement support, effect copying, death prevention, and boss blind detection. See docs/JOKERS.md for complete list.
 
-All 129 functional jokers (111 tested + 16 untested + 2 with test issues) are error-free.
+All 131 functional jokers (113 tested + 16 untested + 2 with test issues) are error-free.
 
 ### Known Issues
 
