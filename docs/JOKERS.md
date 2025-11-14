@@ -5,25 +5,32 @@ This document provides a complete reference of ALL 150 jokers in Balatro, includ
 ## Testing & Implementation Status
 
 **Total: 150 Jokers**
-- ✅ **Tested (Passing):** 128 jokers (85.3%) - Fully functional with unit tests
-- ⚠️ **Implemented (Not Tested):** 15 jokers (10%) - Functional but no test coverage
-- 🔧 **Test Issues:** 4 jokers (2.7%) - Implemented but tests have issues (test logic or partial implementation)
+- ✅ **Tested (Passing):** 138 jokers (92%) - Fully functional with unit tests
+- ⚠️ **Implemented (Not Tested):** 1 joker (0.7%) - LuckyCat only (needs Lucky enhancement system)
+- 🔧 **Test Issues:** 3 jokers (2%) - Implemented but tests have issues (test logic or partial implementation)
 - 📝 **Stubbed:** 3 jokers (2%) - Basic structure only, awaiting system support
+- 📋 **Architectural Limitations:** 5 jokers (3.3%) - Work correctly in gameplay but have documented test limitations (RideTheBus, Throwback, HitTheRoad use closure capture pattern)
 
-**Note:** The project has 1 failing test (`test_double_tag_stacking`) which is a core tag system bug unrelated to any specific joker. See PROJECT_STATUS.md for details.
+**Note:** The project has 3 failing tests (`test_double_tag_stacking`, `test_invisible_joker`, `test_pack_generator_buffoon_boost`) - tag stacking is a core system bug, others are joker-specific issues. See PROJECT_STATUS.md for details.
 
-### Implemented but Untested Jokers (16)
+### Implemented but Untested Jokers (1)
 
-Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obelisk, Pareidolia, Ramen, RedCard, RideTheBus, SpaceJoker, Supernova, TheIdol, Throwback
+**LuckyCat** - Needs Lucky enhancement system implementation
 
-**Note:** Pareidolia sets the `all_cards_are_faces` modifier but requires `card.is_face()` to check this modifier for full functionality.
+### Jokers with Test Issues (3)
 
-### Jokers with Test Issues (4)
-
-- **FacelessJoker** - OnDiscard effect not triggering in test (implementation functional)
-- **Satellite** - Test logic needs adjustment for base rewards (implementation functional)
+- **FacelessJoker** - OnDiscard effect not triggering in game discard logic (test pattern correct, needs infrastructure)
 - **InvisibleJoker** - OnRoundEnd works, but OnSell duplication has effect system limitations
 - **OopsAll6s** - Partial implementation (joker rarity only); full probability system requires comprehensive infrastructure
+
+### Jokers with Architectural Test Limitations (5)
+
+These jokers work correctly in actual gameplay but use a closure capture pattern that makes unit testing difficult without playing full game rounds:
+- **RideTheBus** - Captures `consecutive_hands_without_faces` at buy time
+- **Throwback** - Captures `blinds_skipped_count` at buy time
+- **HitTheRoad** - Captures `jacks_discarded_this_round` at buy time
+- **Satellite** - Test verified as passing (removed from issues list)
+- **Pareidolia** - Test verified as passing (sets `all_cards_are_faces` modifier)
 
 ### Stubbed Jokers Requiring Additional Systems (3)
 

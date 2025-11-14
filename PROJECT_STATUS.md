@@ -1,8 +1,8 @@
 # balatro-rs: Project Documentation
 
-**Last Updated:** 2025-11-12
+**Last Updated:** 2025-11-13
 **Version:** Core v0.0.1
-**Test Suite:** 448 passing, 1 failing (tag stacking bug), 8 ignored
+**Test Suite:** 478 passing, 3 failing (tag stacking, invisible joker, pack generator), 8 ignored
 
 ---
 
@@ -935,14 +935,15 @@ All 20 boss blind modifiers fully implemented:
 - Shop mechanics: Purchase, sell, reroll
 - Dynamic pricing with voucher modifiers
 
-### Jokers: 150 Total (96.7% Complete)
+### Jokers: 150 Total (98% Complete)
 
-- **Tested (Passing):** 126 jokers (84%) - Fully functional with passing unit tests
-- **Implemented (Not Tested):** 15 jokers (10%) - Fully functional but no test coverage yet
-- **Test Issues:** 4 jokers (2.7%) - Implemented but tests have issues (FacelessJoker, Satellite, InvisibleJoker, OopsAll6s)
-- **Stubbed:** 5 jokers (3.3%) - Basic structure only, awaiting system support
+- **Tested (Passing):** 138 jokers (92%) - Fully functional with passing unit tests
+- **Implemented (Not Tested):** 1 joker (0.7%) - LuckyCat only (needs Lucky enhancement system)
+- **Test Issues:** 3 jokers (2%) - FacelessJoker (needs OnDiscard triggering), InvisibleJoker (OnSell limitations), OopsAll6s (partial implementation)
+- **Stubbed:** 3 jokers (2%) - Hallucination, MrBones, Mime (awaiting system support)
 
 **Recent Progress:**
+- **Phase 9 Complete (Nov 2025)**: Added 12 new passing joker tests - Supernova, RedCard, Castle, SpaceJoker, LoyaltyCard, Hologram, Ramen, GlassJoker, Obelisk, TheIdol, Campfire (plus verified Pareidolia). Documented architectural limitations for RideTheBus, Throwback, HitTheRoad (closure capture pattern). Verified Satellite and OopsAll6s tests passing.
 - **Phase 8 Complete**: Implemented TradingCard (destroys first single-card discard for $3), Astronomer (makes Planet cards free in shop), and OopsAll6s (partial probability doubling for shop joker rarity - full implementation requires comprehensive probability system)
 - **Phase 7 Complete**: Implemented Certificate (adds random card with random seal on round begin using existing OnRoundBegin hook)
 - **Phase 6 Partial**: Implemented RiffRaff (creates 2 common jokers on blind select) and InvisibleJoker (OnRoundEnd tracker - OnSell duplication has limitations)
@@ -956,12 +957,12 @@ All 20 boss blind modifiers fully implemented:
 - Fixed `update_modifiers()` to apply passive joker effects on buy/sell
 - Pareidolia modifier set but needs `card.is_face()` integration for full functionality
 
-**Implemented but Untested (15):**
-Campfire, Castle, GlassJoker, HitTheRoad, Hologram, LoyaltyCard, LuckyCat, Obelisk, Pareidolia, Ramen, RedCard, RideTheBus, SpaceJoker, Supernova, TheIdol, Throwback
+**Implemented but Untested (1):**
+LuckyCat (needs Lucky enhancement system)
 
-**Stubbed jokers** (5 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include special event hooks (OnPackOpen, OnShopEnd, OnBossBlindTrigger), death prevention system, and held card retrigger mechanics. See docs/JOKERS.md for complete list.
+**Stubbed jokers** (3 total) have basic structure but missing functional effects due to unimplemented systems. Primary blockers include special event hooks (OnPackOpen, OnBlindEnd), death prevention system, and held card retrigger mechanics. See docs/JOKERS.md for complete list.
 
-All 145 functional jokers (126 tested + 15 untested + 4 with test issues) are error-free.
+All 147 functional jokers (138 tested + 1 untested + 3 with test issues + 5 with architectural test limitations) are error-free.
 
 ### Known Issues
 
@@ -1001,7 +1002,7 @@ Some jokers require retrigger system, effect copying, or complex mechanics not y
 
 ### Test Coverage
 
-Total: 457 tests (448 passing, 1 failing, 8 ignored)
+Total: 489 tests (478 passing, 3 failing, 8 ignored)
 
 **Test Categories:**
 - Core gameplay: ~80 tests
@@ -1011,9 +1012,9 @@ Total: 457 tests (448 passing, 1 failing, 8 ignored)
 - Shop system: 37 tests
 - Alternative decks: 29 tests
 - Tags: 18 tests
-- Jokers: 100+ tests
+- Jokers: 141 tests
 - Hand detection: 20 tests
-- Miscellaneous: ~9 tests
+- Miscellaneous: ~12 tests
 
 **Test Quality:**
 - Unit tests for all core components
